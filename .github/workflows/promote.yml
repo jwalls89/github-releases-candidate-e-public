@@ -109,35 +109,54 @@ jobs:
             git push origin "${FINAL}"
           fi
 
+      - name: Find previous stable release
+        id: prev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FINAL="${{ steps.final.outputs.version }}"
+          # Find the previous stable release tag (not pre-release, not current)
+          PREV=$(gh release list --exclude-drafts --exclude-pre-releases \
+            --json tagName --jq '.[].tagName' \
+            | grep -v "^${FINAL}$" \
+            | head -1)
+          echo "previous=${PREV}" >> $GITHUB_OUTPUT
+          if [[ -n "${PREV}" ]]; then
+            echo "Previous stable release: ${PREV}"
+          else
+            echo "No previous stable release found"
+          fi
+
       - name: Publish stable GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           FINAL="${{ steps.final.outputs.version }}"
-          # Check if a draft release exists for this version
-          DRAFT_EXISTS=$(gh release view "${FINAL}" --json isDraft --jq '.isDraft' 2>/dev/null || echo "none")
-          if [[ "${DRAFT_EXISTS}" == "true" ]]; then
-            echo "Converting draft release ${FINAL} to stable"
-            gh release edit "${FINAL}" \
-              --draft=false \
-              --prerelease=false \
-              --latest \
-              --tag "${FINAL}"
-            # Update notes with auto-generated content
-            NOTES=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
-              -f tag_name="${FINAL}" \
-              --jq '.body' 2>/dev/null || echo "")
-            if [[ -n "${NOTES}" ]]; then
-              gh release edit "${FINAL}" --notes "${NOTES}"
-            fi
-          elif [[ "${DRAFT_EXISTS}" == "none" ]]; then
-            echo "No draft found — creating stable release ${FINAL}"
-            gh release create "${FINAL}" \
-              --title "${FINAL}" \
-              --generate-notes \
-              --latest
+          PREV="${{ steps.prev.outputs.previous }}"
+          if gh release view "${FINAL}" --json isDraft --jq '.isDraft' 2>/dev/null | grep -q true; then
+            echo "Deleting draft release ${FINAL}"
+            gh release delete "${FINAL}" --yes
+          fi
+          if gh release view "${FINAL}" 2>/dev/null | grep -q .; then
+            echo "Release ${FINAL} already exists — skipping"
           else
-            echo "Release ${FINAL} already exists and is not a draft — skipping"
+            if [[ -n "${PREV}" ]]; then
+              echo "Creating stable release ${FINAL} with notes from ${PREV}"
+              NOTES=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
+                -f tag_name="${FINAL}" \
+                -f previous_tag_name="${PREV}" \
+                --jq '.body')
+              gh release create "${FINAL}" \
+                --title "${FINAL}" \
+                --notes "${NOTES}" \
+                --latest
+            else
+              echo "Creating stable release ${FINAL} (first release)"
+              gh release create "${FINAL}" \
+                --title "${FINAL}" \
+                --generate-notes \
+                --latest
+            fi
           fi
 
       - name: Determine release branch

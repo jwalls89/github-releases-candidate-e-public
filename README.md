@@ -1,6 +1,6 @@
 # Candidate E: Trunk-Based + Release Branches + GitHub Releases Dashboard
 
-Same branching model as Candidate B, but uses GitHub Releases (draft → pre-release → stable) as the single source of truth for release state.
+Same branching model as Candidate B, but uses GitHub Releases (pre-release → stable) as the single source of truth for release state.
 
 ## How It Differs from Candidate B
 
@@ -8,10 +8,10 @@ The branching model, promotion flow, and all guardrails are identical to Candida
 
 | What you want to know | Candidate B | Candidate E |
 |----------------------|-------------|-------------|
-| Is a release planned? | Check for release branch | **Draft** release on Releases page |
 | What's being promoted? | Look at RC tags | **Pre-releases** on Releases page |
 | What's in prod? | Find the latest final tag | **Latest stable release** on Releases page |
 | How many attempts? | Count RC tags | Count **pre-releases** on Releases page |
+| Full changelog | Click the GitHub Release | Click the GitHub Release — notes show ALL changes since last stable release |
 
 The Releases page becomes the dashboard. Anyone can glance at it and know the state of the world.
 
@@ -27,41 +27,46 @@ Releases page after a clean release:
 
 Releases page during a bumpy promotion:
 
-  v1.3.0         [Draft]        Intent to release (visible to collaborators)
   v1.3.0-rc.3   [Pre-release]  Third attempt — currently promoting
   v1.3.0-rc.2   [Pre-release]  Second attempt — had a config issue
   v1.3.0-rc.1   [Pre-release]  First attempt — failed in test
   v1.2.0         [Latest]       Still the current prod release
+
+After v1.3.0 reaches prod:
+
+  v1.3.0         [Latest]       Stable — changelog shows ALL changes since v1.2.0
+  v1.3.0-rc.3   [Pre-release]  The RC that made it
+  v1.3.0-rc.2   [Pre-release]  Second attempt
+  v1.3.0-rc.1   [Pre-release]  First attempt
+  v1.2.0                        Previous prod release
 ```
 
 ### Pipeline Flow
 
 ```
- ┌──────────────┐         ┌─────────────────────────────────────────────────────────┐
- │  Cut Release Candidate  │         │              Promote (auto-triggered)                   │
- │  (from main)  │         │                                                         │
- │               │ triggers│  ┌──────┐  ┌─────────┐  ┌──────┐  ┌─────────────────┐ │
- │ Creates:      │────────►│  │ Test │─►│ Preprod  │─►│ Prod │─►│ Finalise        │ │
- │ - branch      │         │  │(auto)│  │(approval)│  │(approval)│- final tag     │ │
- │ - rc.1 tag    │         │  └──────┘  └─────────┘  └──────┘  │- draft → stable │ │
- │ - draft       │         │                                     │- merge-back     │ │
- │ - pre-release │         │                                     │  issue          │ │
- └──────────────┘         │                                     └─────────────────┘ │
-                           │                                                         │
- ┌──────────────┐         │                                                         │
- │  Tag New RC   │ triggers│                                                         │
- │  (from        │────────►│  (pipeline restarts from test, cancels previous run)    │
- │  release/*)   │         │                                                         │
- │               │         └─────────────────────────────────────────────────────────┘
- │ Creates:      │
- │ - rc.N tag    │
- │ - pre-release │
- └──────────────┘
+ ┌───────────────────────┐   ┌──────────────────────────────────────────────────────┐
+ │  Cut Release Candidate │   │              Promote (auto-triggered)                │
+ │  (from main)           │   │                                                      │
+ │                        │   │  ┌──────┐  ┌─────────┐  ┌──────┐  ┌──────────────┐ │
+ │ Creates:          triggers │  │ Test │─►│ Preprod  │─►│ Prod │─►│ Finalise     │ │
+ │ - branch          ────────►│  │(auto)│  │(approval)│  │(approval)│- final tag  │ │
+ │ - rc.1 tag             │   │  └──────┘  └─────────┘  └──────┘  │- stable      │ │
+ │ - pre-release          │   │                                     │  release     │ │
+ └───────────────────────┘   │                                     │- merge-back  │ │
+                              │                                     │  issue       │ │
+ ┌───────────────────────┐   │                                     └──────────────┘ │
+ │  Tag New RC            │   │                                                      │
+ │  (from release/*)  triggers  (pipeline restarts, cancels previous run)            │
+ │                   ────────►│                                                      │
+ │ Creates:               │   └──────────────────────────────────────────────────────┘
+ │ - rc.N tag             │
+ │ - pre-release          │
+ └───────────────────────┘
 
- ┌──────────────┐
- │  Hotfix       │  Creates a new release/X.Y.Z branch from a release tag.
- │  (from main)  │  Then: push fix → Tag New RC → same pipeline as above.
- └──────────────┘
+ ┌───────────────────────┐
+ │  Hotfix                │  Creates a new release/X.Y.Z branch from a release tag.
+ │  (from main)           │  Then: push fix → Tag New RC → same pipeline as above.
+ └───────────────────────┘
 ```
 
 ## Key Concepts
@@ -71,9 +76,8 @@ Releases page during a bumpy promotion:
 | **main** | Where all development happens. Never stops. |
 | **release/X.Y.0** | Cut from main when ready to release. Lives ~1 week during promotion. |
 | **release/X.Y.Z** (Z>0) | Hotfix branch, cut from a release tag. Isolated from the original. |
-| **Draft release** | Created when a release is cut. Signals intent. Only visible to collaborators. |
 | **Pre-release** | Published for each RC tag. Shows promotion history on the Releases page. |
-| **Stable release** | Published when an RC reaches prod. The draft becomes the stable release. This IS the release. |
+| **Stable release** | Published when an RC reaches prod. Changelog shows ALL changes since previous stable release. |
 | **Merge-back issue** | Created automatically at finalise if the release branch has fixes not on main. |
 
 ## Environments
@@ -88,10 +92,10 @@ Releases page during a bumpy promotion:
 
 | Workflow | Run from branch | Trigger | Purpose |
 |----------|----------------|---------|---------|
-| **Cut Release Candidate** | `main` | Manual | Creates branch + rc.1 tag + draft release + pre-release, triggers Promote |
+| **Cut Release Candidate** | `main` | Manual | Creates branch + rc.1 tag + pre-release, triggers Promote |
 | **Tag New RC** | `release/*` | Manual | Creates next RC tag + pre-release after a fix, triggers Promote |
 | **Hotfix** | `main` | Manual | Creates a new patch release branch from a release tag |
-| **Promote** | `release/*` | Auto-triggered | Deploys test → preprod → prod, converts draft to stable release |
+| **Promote** | `release/*` | Auto-triggered | Deploys test → preprod → prod, creates stable release at prod |
 | **Deploy** | `release/*` | Called by Promote | Simulates deployment to one environment |
 
 ---
@@ -117,7 +121,7 @@ Before running scenarios, configure GitHub Environments:
 
 A clean release — no fixes needed, straight through to prod.
 
-### Step 1: Cut the release
+### Step 1: Cut the release candidate
 
 1. Go to **Actions → Cut Release Candidate → Run workflow**
 2. Enter version: `1.2.0`
@@ -126,8 +130,7 @@ A clean release — no fixes needed, straight through to prod.
 This creates:
 - Branch `release/1.2.0`
 - Tag `v1.2.0-rc.1`
-- **Draft** release `v1.2.0` (visible on Releases page to collaborators)
-- **Pre-release** `v1.2.0-rc.1` (visible on Releases page to everyone)
+- **Pre-release** `v1.2.0-rc.1` on the Releases page
 
 ### Step 2: Watch it flow
 
@@ -135,13 +138,12 @@ The Promote workflow triggers automatically:
 1. **Test** — deploys automatically
 2. **Preprod** — click **Review deployments** → approve
 3. **Prod** — click **Review deployments** → approve
-4. **Finalise** — converts the draft `v1.2.0` to a **stable release** with auto-generated notes
+4. **Finalise** — creates tag `v1.2.0` and a **stable release** with full changelog since the previous release
 
 ### Step 3: Verify
 
-- **Releases** page → `v1.2.0` is the **Latest** stable release
+- **Releases** page → `v1.2.0` is **Latest** with full changelog
 - Pre-release `v1.2.0-rc.1` shows the single RC that made it through
-- No merge-back issue (no fixes were needed)
 
 ---
 
@@ -156,8 +158,8 @@ Release hits problems during promotion. Fix, re-tag, restart.
 3. Something is wrong — do NOT approve preprod
 
 **Releases page now shows:**
-- `v1.3.0` [Draft] — intent to release
 - `v1.3.0-rc.1` [Pre-release] — first attempt
+- `v1.2.0` [Latest] — still the current prod release
 
 ### Step 2: Fix the issue on the release branch
 
@@ -178,18 +180,19 @@ git push origin release/1.3.0
 4. Click **Run workflow**
 
 **Releases page now shows:**
-- `v1.3.0` [Draft] — still in progress
 - `v1.3.0-rc.2` [Pre-release] — new attempt with fix
 - `v1.3.0-rc.1` [Pre-release] — previous failed attempt
+- `v1.2.0` [Latest] — still the current prod release
 
 ### Step 4: Approve through environments
 
-Eventually an RC makes it all the way through. The finalise step converts the draft to a stable release.
+Eventually an RC makes it through. The finalise step creates a **stable release** `v1.3.0`.
 
 **Releases page now shows:**
-- `v1.3.0` [Latest] — stable release in prod
+- `v1.3.0` [Latest] — stable release, changelog shows ALL changes since v1.2.0
 - `v1.3.0-rc.2` [Pre-release] — the RC that made it
 - `v1.3.0-rc.1` [Pre-release] — the first attempt that failed
+- `v1.2.0` — previous prod release
 
 ### Step 5: Merge back
 
@@ -236,7 +239,7 @@ git push origin release/1.3.1
 Same flow: test (auto) → preprod (approve) → prod (approve) → finalise.
 
 **Releases page now shows:**
-- `v1.3.1` [Latest] — hotfix is now in prod
+- `v1.3.1` [Latest] — hotfix in prod, changelog shows changes since v1.3.0
 - `v1.3.1-rc.1` [Pre-release] — the hotfix RC
 - `v1.3.0` — previous prod release
 
@@ -270,15 +273,16 @@ Then open a PR from `merge-back/1.3.0` to `main`, review, and merge. Close the i
 
 | Action | How |
 |--------|-----|
-| Cut a release | Actions → **Cut Release Candidate** (from main) → enter version |
+| Cut a release candidate | Actions → **Cut Release Candidate** (from main) → enter version |
 | Approve promotion | Click paused workflow run → **Review deployments** → approve |
 | Fix during promotion | Push fix to release branch → Actions → **Tag New RC** (from release branch) → enter version |
 | Start a hotfix | Actions → **Hotfix** (from main) → enter base version currently in prod |
 | Promote a hotfix | Push fix to hotfix branch → Actions → **Tag New RC** (from hotfix branch) → enter version |
 | Merge back fixes | Follow the merge-back issue created by finalise |
 | See what's in prod | **Releases** page → **Latest** stable release |
-| See what's in-flight | **Releases** page → **Pre-releases** and **Drafts** |
+| See what's in-flight | **Releases** page → **Pre-releases** without a matching stable release |
 | See promotion history | **Releases** page → trail of pre-releases for each version |
+| See full changelog | Click any stable release → notes show ALL changes since previous stable release |
 
 ## Branching Rules
 
