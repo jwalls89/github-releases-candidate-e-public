@@ -38,7 +38,7 @@ Releases page during a bumpy promotion:
 
 ```
  ┌──────────────┐         ┌─────────────────────────────────────────────────────────┐
- │  Cut Release  │         │              Promote (auto-triggered)                   │
+ │  Cut Release Candidate  │         │              Promote (auto-triggered)                   │
  │  (from main)  │         │                                                         │
  │               │ triggers│  ┌──────┐  ┌─────────┐  ┌──────┐  ┌─────────────────┐ │
  │ Creates:      │────────►│  │ Test │─►│ Preprod  │─►│ Prod │─►│ Finalise        │ │
@@ -88,7 +88,7 @@ Releases page during a bumpy promotion:
 
 | Workflow | Run from branch | Trigger | Purpose |
 |----------|----------------|---------|---------|
-| **Cut Release** | `main` | Manual | Creates branch + rc.1 tag + draft release + pre-release, triggers Promote |
+| **Cut Release Candidate** | `main` | Manual | Creates branch + rc.1 tag + draft release + pre-release, triggers Promote |
 | **Tag New RC** | `release/*` | Manual | Creates next RC tag + pre-release after a fix, triggers Promote |
 | **Hotfix** | `main` | Manual | Creates a new patch release branch from a release tag |
 | **Promote** | `release/*` | Auto-triggered | Deploys test → preprod → prod, converts draft to stable release |
@@ -119,7 +119,7 @@ A clean release — no fixes needed, straight through to prod.
 
 ### Step 1: Cut the release
 
-1. Go to **Actions → Cut Release → Run workflow**
+1. Go to **Actions → Cut Release Candidate → Run workflow**
 2. Enter version: `1.2.0`
 3. Click **Run workflow**
 
@@ -151,7 +151,7 @@ Release hits problems during promotion. Fix, re-tag, restart.
 
 ### Step 1: Cut and start promotion
 
-1. **Cut Release** with version `1.3.0`
+1. **Cut Release Candidate** with version `1.3.0`
 2. Promote triggers automatically, deploys to test
 3. Something is wrong — do NOT approve preprod
 
@@ -270,7 +270,7 @@ Then open a PR from `merge-back/1.3.0` to `main`, review, and merge. Close the i
 
 | Action | How |
 |--------|-----|
-| Cut a release | Actions → **Cut Release** (from main) → enter version |
+| Cut a release | Actions → **Cut Release Candidate** (from main) → enter version |
 | Approve promotion | Click paused workflow run → **Review deployments** → approve |
 | Fix during promotion | Push fix to release branch → Actions → **Tag New RC** (from release branch) → enter version |
 | Start a hotfix | Actions → **Hotfix** (from main) → enter base version currently in prod |
