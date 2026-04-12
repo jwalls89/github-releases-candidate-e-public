@@ -1,5 +1,7 @@
 """Unit tests for CutRelease."""
 
+from unittest import mock
+
 import pytest
 from pytest_mock import MockerFixture
 from semver import Version
@@ -77,6 +79,7 @@ class TestCutRelease:
             "v2.0.0-rc.1",
         )
 
+    @mock.patch.dict("os.environ", {}, clear=True)
     def test_run_writes_summary(self, capsys: pytest.CaptureFixture[str]) -> None:
         CutRelease(self.mock_git, self.mock_github, "2.0.0").run()
 
