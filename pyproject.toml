@@ -1,0 +1,48 @@
+[project]
+name = "release-tools"
+version = "0.1.0"
+description = "Python classes for GitHub Actions release workflows"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "gitpython",
+    "invoke",
+    "python-dotenv",
+    "pygithub",
+    "semver",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/release_tools"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812",  # conflicts with ruff formatter
+    "D203",  # incompatible with D211
+    "D213",  # incompatible with D212
+    "T201",  # print is used intentionally
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = [
+    "D104",     # __init__.py files don't need docstrings
+]
+"tests/**/*.py" = [
+    "S101",     # assert is fine in tests
+    "D102",     # test methods don't need docstrings
+    "PLR2004",  # magic values in assertions are fine
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit",
+    "pytest>=9.0.3",
+    "pytest-mock",
+    "ruff",
+    "ty",
+]
