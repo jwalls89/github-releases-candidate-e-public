@@ -28,9 +28,21 @@ ignore = [
     "T201",  # print is used intentionally
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = [
+    "D104",     # __init__.py files don't need docstrings
+]
+"tests/**/*.py" = [
+    "S101",     # assert is fine in tests
+    "D102",     # test methods don't need docstrings
+    "PLR2004",  # magic values in assertions are fine
+]
+
 [dependency-groups]
 dev = [
+    "pre-commit",
     "pytest>=9.0.3",
+    "pytest-mock",
     "ruff",
     "ty",
 ]

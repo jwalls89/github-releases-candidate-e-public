@@ -1,0 +1,21 @@
+name: Code Quality
+description: Run ruff, ty, and pytest checks
+
+runs:
+  using: composite
+  steps:
+    - name: Ruff lint
+      shell: bash
+      run: uv run ruff check src/ tasks/ tests/
+
+    - name: Ruff format
+      shell: bash
+      run: uv run ruff format --check src/ tasks/ tests/
+
+    - name: Type check
+      shell: bash
+      run: uv run ty check src/ tasks/
+
+    - name: Unit tests
+      shell: bash
+      run: uv run pytest tests/unit/
