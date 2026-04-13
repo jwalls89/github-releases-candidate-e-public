@@ -73,9 +73,10 @@ class TestGitHubHelper:
         mock_branch.commit.sha = "abc123"
         self.mock_repo.get_branch.return_value = mock_branch
 
-        result = self.helper.create_rc_tag("1.2.0", "release/1.2.0")
+        tag_name, commit_sha = self.helper.create_rc_tag("1.2.0", "release/1.2.0")
 
-        assert result == "v1.2.0-rc.1"
+        assert tag_name == "v1.2.0-rc.1"
+        assert commit_sha == "abc123"
         self.mock_repo.get_branch.assert_called_once_with("release/1.2.0")
         self.mock_repo.create_git_ref.assert_called_once_with(
             ref="refs/tags/v1.2.0-rc.1", sha="abc123"
@@ -86,12 +87,48 @@ class TestGitHubHelper:
         mock_branch.commit.sha = "abc123"
         self.mock_repo.get_branch.return_value = mock_branch
 
-        result = self.helper.create_rc_tag("1.2.0", "release/1.2.0", rc_number=3)
+        tag_name, _ = self.helper.create_rc_tag("1.2.0", "release/1.2.0", rc_number=3)
 
-        assert result == "v1.2.0-rc.3"
+        assert tag_name == "v1.2.0-rc.3"
         self.mock_repo.create_git_ref.assert_called_once_with(
             ref="refs/tags/v1.2.0-rc.3", sha="abc123"
         )
+
+    # -- create_release_branch --
+
+    def test_create_release_branch_creates_ref_from_tag(
+        self, mocker: MockerFixture
+    ) -> None:
+        source_ref = mocker.Mock(object=mocker.Mock(sha="abc123", type="commit"))
+        self.mock_repo.get_git_ref.return_value = source_ref
+
+        commit_sha = self.helper.create_release_branch("1.3.1", source_tag="v1.3.0")
+
+        assert commit_sha == "abc123"
+        self.mock_repo.get_git_ref.assert_called_once_with("tags/v1.3.0")
+        self.mock_repo.create_git_ref.assert_called_once_with(
+            ref="refs/heads/release/1.3.1", sha="abc123"
+        )
+
+    def test_create_release_branch_dereferences_annotated_tag(
+        self, mocker: MockerFixture
+    ) -> None:
+        tag_object = mocker.Mock(sha="tag_obj_sha", type="tag")
+        self.mock_repo.get_git_ref.return_value = mocker.Mock(object=tag_object)
+        self.mock_repo.get_git_tag.return_value = mocker.Mock(
+            object=mocker.Mock(sha="commit_sha")
+        )
+
+        commit_sha = self.helper.create_release_branch("1.3.1", source_tag="v1.3.0")
+
+        assert commit_sha == "commit_sha"
+        self.mock_repo.get_git_tag.assert_called_once_with("tag_obj_sha")
+
+    def test_create_release_branch_raises_when_tag_not_found(self) -> None:
+        self.mock_repo.get_git_ref.side_effect = UnknownObjectException(404, {}, {})
+
+        with pytest.raises(ValueError, match="not found on GitHub"):
+            self.helper.create_release_branch("1.3.1", source_tag="v9.9.9")
 
     # -- trigger_promotion --
 

@@ -32,10 +32,11 @@ class Hotfix:
 
         self._github.validate_release_branch_does_not_exist(hotfix_version_str)
 
-        self._git.create_release_branch(hotfix_version_str, source_ref=base_tag)
+        commit_sha = self._github.create_release_branch(
+            hotfix_version_str, source_tag=base_tag
+        )
         print(f"Created branch release/{hotfix_version_str} from {base_tag}")
 
-        commit_sha = self._git.get_head_sha()
         self._write_summary(base_version_str, hotfix_version_str, commit_sha)
 
     @staticmethod

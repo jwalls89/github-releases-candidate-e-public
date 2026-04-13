@@ -39,7 +39,7 @@ class CutRelease:
         self._git.create_release_branch(version_str)
 
         print(f"Creating RC tag v{version_str}-rc.1...")
-        tag_name = self._github.create_rc_tag(version_str, branch)
+        tag_name, commit_sha = self._github.create_rc_tag(version_str, branch)
 
         previous_tag = f"v{latest}" if latest else None
         print(f"Publishing pre-release {tag_name}...")
@@ -48,7 +48,6 @@ class CutRelease:
         print("Triggering promotion pipeline...")
         self._github.trigger_promotion(branch, tag_name)
 
-        commit_sha = self._git.get_head_sha()
         self._write_summary(version_str, tag_name, commit_sha)
 
     @staticmethod

@@ -19,8 +19,7 @@ class TestTagRC:
         self.mock_git = mocker.Mock(spec_set=GitHelper)
         self.mock_github = mocker.Mock(spec_set=GitHubHelper)
         self.mock_git.get_next_rc_number.return_value = 3
-        self.mock_git.get_head_sha.return_value = "abc123"
-        self.mock_github.create_rc_tag.return_value = "v2.0.0-rc.3"
+        self.mock_github.create_rc_tag.return_value = ("v2.0.0-rc.3", "abc123")
         self.mock_github.create_prerelease.return_value = (
             "https://github.com/owner/repo/releases/v2.0.0-rc.3"
         )

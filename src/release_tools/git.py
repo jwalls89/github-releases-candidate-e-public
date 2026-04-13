@@ -174,29 +174,9 @@ class GitHelper:
 
         return Version(base_version.major, base_version.minor, highest_patch + 1)
 
-    def create_release_branch(
-        self, version: str, source_ref: str | None = None
-    ) -> None:
-        """Create a ``release/{version}`` branch and push it to origin.
-
-        If *source_ref* is provided, it is resolved to a commit SHA
-        via ``ls-remote`` so it does not need to exist in the local
-        clone.  This is used for hotfixes that branch from a stable
-        tag.
-
-        Raises:
-            ValueError: If *source_ref* is not found on origin.
-
-        """
-        if source_ref:
-            ls_remote_output = self._repo.git.ls_remote("--tags", "origin")
-            source_sha = self._resolve_remote_tag_sha(ls_remote_output, source_ref)
-            if not source_sha:
-                msg = f"Source tag {source_ref} not found on origin"
-                raise ValueError(msg)
-            branch = self._repo.create_head(f"release/{version}", commit=source_sha)
-        else:
-            branch = self._repo.create_head(f"release/{version}")
+    def create_release_branch(self, version: str) -> None:
+        """Create a ``release/{version}`` branch from HEAD and push it."""
+        branch = self._repo.create_head(f"release/{version}")
         self._repo.remotes.origin.push(branch.name)
 
     def get_repo_name(self) -> str:
@@ -208,13 +188,3 @@ class GitHelper:
         if ":" in cleaned and not cleaned.startswith("http"):
             return cleaned.split(":")[-1]
         return "/".join(cleaned.split("/")[-2:])
-
-    def get_head_sha(self) -> str:
-        """Return the SHA of the current HEAD commit."""
-        return self._repo.head.commit.hexsha
-
-    def configure_identity(self, name: str, email: str) -> None:
-        """Set the git user name and email for the repo."""
-        with self._repo.config_writer() as config:
-            config.set_value("user", "name", name)
-            config.set_value("user", "email", email)

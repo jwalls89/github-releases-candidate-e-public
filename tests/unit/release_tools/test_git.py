@@ -236,26 +236,6 @@ class TestGitHelper:
         self.mock_repo.create_head.assert_called_once_with("release/1.2.0")
         self.mock_origin.push.assert_called_once_with("release/1.2.0")
 
-    def test_create_release_branch_with_source_ref(self) -> None:
-        mock_branch = self.mock_repo.create_head.return_value
-        mock_branch.name = "release/1.3.1"
-        self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
-            "refs/tags/v1.3.0",
-        )
-
-        self.helper.create_release_branch("1.3.1", source_ref="v1.3.0")
-
-        self.mock_repo.create_head.assert_called_once_with(
-            "release/1.3.1", commit="0" * 40
-        )
-        self.mock_origin.push.assert_called_once_with("release/1.3.1")
-
-    def test_create_release_branch_raises_when_source_ref_not_found(self) -> None:
-        self.mock_repo.git.ls_remote.return_value = ""
-
-        with pytest.raises(ValueError, match="not found on origin"):
-            self.helper.create_release_branch("1.3.1", source_ref="v1.3.0")
-
     def test_get_repo_name_parses_ssh_url(self) -> None:
         self.mock_origin.url = "git@github.com:owner/repo.git"
 
@@ -269,25 +249,6 @@ class TestGitHelper:
         result = self.helper.get_repo_name()
 
         assert result == "owner/repo"
-
-    def test_get_head_sha_returns_commit_hexsha(self) -> None:
-        self.mock_repo.head.commit.hexsha = "abc123def456"
-
-        result = self.helper.get_head_sha()
-
-        assert result == "abc123def456"
-
-    def test_configure_identity_sets_user_name_and_email(
-        self, mocker: MockerFixture
-    ) -> None:
-        mock_writer = mocker.MagicMock()
-        self.mock_repo.config_writer.return_value = mock_writer
-        mock_config = mock_writer.__enter__.return_value
-
-        self.helper.configure_identity("Bot", "bot@example.com")
-
-        mock_config.set_value.assert_any_call("user", "name", "Bot")
-        mock_config.set_value.assert_any_call("user", "email", "bot@example.com")
 
     @staticmethod
     def _fake_ls_remote(*ref_paths: str) -> str:
