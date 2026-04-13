@@ -19,7 +19,7 @@ class TestHotfix:
         self.mock_git = mocker.Mock(spec_set=GitHelper)
         self.mock_github = mocker.Mock(spec_set=GitHubHelper)
         self.mock_git.get_next_hotfix_version.return_value = Version.parse("1.3.1")
-        self.mock_git.get_head_sha.return_value = "abc123"
+        self.mock_github.create_release_branch.return_value = "abc123"
         mocker.patch(
             "release_tools.hotfix.ReleaseVersionHelper.parse",
             return_value=Version.parse("1.3.0"),
@@ -61,22 +61,21 @@ class TestHotfix:
     def test_run_creates_release_branch_from_base_tag(self) -> None:
         Hotfix(self.mock_git, self.mock_github, "1.3.0").run()
 
-        self.mock_git.create_release_branch.assert_called_once_with(
-            "1.3.1", source_ref="v1.3.0"
+        self.mock_github.create_release_branch.assert_called_once_with(
+            "1.3.1", source_tag="v1.3.0"
         )
 
     def test_run_calls_steps_in_correct_order(self) -> None:
         Hotfix(self.mock_git, self.mock_github, "1.3.0").run()
 
         github_methods = [call[0] for call in self.mock_github.method_calls]
-        git_methods = [call[0] for call in self.mock_git.method_calls]
 
         assert github_methods.index("validate_tag_exists") < github_methods.index(
             "validate_release_branch_does_not_exist"
         )
-        assert git_methods.index("get_next_hotfix_version") < git_methods.index(
-            "create_release_branch"
-        )
+        assert github_methods.index(
+            "validate_release_branch_does_not_exist"
+        ) < github_methods.index("create_release_branch")
 
     @mock.patch.dict("os.environ", {}, clear=True)
     def test_run_writes_summary(self, capsys: pytest.CaptureFixture[str]) -> None:

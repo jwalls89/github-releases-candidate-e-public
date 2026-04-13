@@ -28,7 +28,9 @@ class TagRC:
         rc_number = self._git.get_next_rc_number(version_str)
         print(f"Next RC number: {rc_number}")
 
-        tag_name = self._github.create_rc_tag(version_str, branch, rc_number=rc_number)
+        tag_name, commit_sha = self._github.create_rc_tag(
+            version_str, branch, rc_number=rc_number
+        )
         print(f"Created tag {tag_name}")
 
         url = self._github.create_prerelease(tag_name, branch)
@@ -37,7 +39,6 @@ class TagRC:
         self._github.trigger_promotion(branch, tag_name)
         print(f"Promotion pipeline triggered for {tag_name}")
 
-        commit_sha = self._git.get_head_sha()
         self._write_summary(version_str, tag_name, commit_sha)
 
     @staticmethod

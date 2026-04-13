@@ -20,8 +20,7 @@ class TestCutRelease:
         self.mock_github = mocker.Mock(spec_set=GitHubHelper)
         self.mock_git.get_latest_stable_tag.return_value = Version.parse("1.0.0")
         self.mock_git.get_inflight_release.return_value = None
-        self.mock_git.get_head_sha.return_value = "abc123"
-        self.mock_github.create_rc_tag.return_value = "v2.0.0-rc.1"
+        self.mock_github.create_rc_tag.return_value = ("v2.0.0-rc.1", "abc123")
         mocker.patch(
             "release_tools.cut_release.ReleaseVersionHelper.parse",
             return_value=Version.parse("2.0.0"),
