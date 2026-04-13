@@ -47,9 +47,8 @@ class ValidatePromotion:
     @staticmethod
     def _write_output(tag_name: str) -> None:
         """Write the validated version to GITHUB_OUTPUT or stdout."""
+        print(f"version={tag_name}")
         output_path = os.environ.get("GITHUB_OUTPUT")
         if output_path:
             with Path(output_path).open("a") as fh:
                 fh.write(f"version={tag_name}\n")
-        else:
-            print(f"version={tag_name}")

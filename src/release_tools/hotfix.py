@@ -58,9 +58,8 @@ class Hotfix:
             "3. After prod deployment, the merge-back issue"
             " will be created automatically\n"
         )
+        print(summary)
         summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
         if summary_path:
             with Path(summary_path).open("a") as fh:
                 fh.write(summary)
-        else:
-            print(summary)
