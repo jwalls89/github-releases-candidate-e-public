@@ -39,9 +39,7 @@ class Hotfix:
         self._write_summary(base_version_str, hotfix_version_str, commit_sha)
 
     @staticmethod
-    def _write_summary(
-        base_version: str, hotfix_version: str, commit_sha: str
-    ) -> None:
+    def _write_summary(base_version: str, hotfix_version: str, commit_sha: str) -> None:
         """Write the hotfix summary to step summary or stdout."""
         summary = (
             "## Hotfix Branch Created\n"

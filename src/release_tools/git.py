@@ -91,8 +91,7 @@ class GitHelper:
             remote_tag_output, prefix="refs/tags/"
         )
         stable_tags = {
-            name for name in remote_tag_names
-            if self._STABLE_TAG_PATTERN.match(name)
+            name for name in remote_tag_names if self._STABLE_TAG_PATTERN.match(name)
         }
 
         remote_branch_output = self._repo.git.ls_remote("--heads", "origin")

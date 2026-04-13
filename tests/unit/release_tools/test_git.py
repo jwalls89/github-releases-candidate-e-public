@@ -51,8 +51,7 @@ class TestGitHelper:
 
     def test_get_latest_stable_tag_ignores_dereference_entries(self) -> None:
         self.mock_repo.git.ls_remote.return_value = (
-            self._fake_ls_remote("refs/tags/v1.0.0")
-            + "\nabc123\trefs/tags/v1.0.0^{}"
+            self._fake_ls_remote("refs/tags/v1.0.0") + "\nabc123\trefs/tags/v1.0.0^{}"
         )
 
         result = self.helper.get_latest_stable_tag()
@@ -317,8 +316,7 @@ class TestGitHelper:
 
     def test_create_final_tag_prefers_dereferenced_sha(self) -> None:
         self.mock_repo.git.ls_remote.return_value = (
-            "aaa111\trefs/tags/v1.2.0-rc.1\n"
-            "bbb222\trefs/tags/v1.2.0-rc.1^{}"
+            "aaa111\trefs/tags/v1.2.0-rc.1\nbbb222\trefs/tags/v1.2.0-rc.1^{}"
         )
 
         self.helper.create_final_tag("v1.2.0", "v1.2.0-rc.1")
