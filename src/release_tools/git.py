@@ -199,16 +199,6 @@ class GitHelper:
             branch = self._repo.create_head(f"release/{version}")
         self._repo.remotes.origin.push(branch.name)
 
-    def create_rc_tag(self, version: str, rc_number: int = 1) -> str:
-        """Create an RC tag and push it to origin.
-
-        Returns the tag name.
-        """
-        tag_name = f"v{version}-rc.{rc_number}"
-        self._repo.create_tag(tag_name)
-        self._repo.remotes.origin.push(tag_name)
-        return tag_name
-
     def get_repo_name(self) -> str:
         """Derive the GitHub ``owner/repo`` name from the origin URL."""
         origin_url = self._repo.remotes.origin.url

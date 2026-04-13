@@ -28,7 +28,7 @@ class TagRC:
         rc_number = self._git.get_next_rc_number(version_str)
         print(f"Next RC number: {rc_number}")
 
-        tag_name = self._git.create_rc_tag(version_str, rc_number=rc_number)
+        tag_name = self._github.create_rc_tag(version_str, branch, rc_number=rc_number)
         print(f"Created tag {tag_name}")
 
         url = self._github.create_prerelease(tag_name, branch)

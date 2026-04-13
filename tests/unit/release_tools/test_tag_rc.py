@@ -19,8 +19,8 @@ class TestTagRC:
         self.mock_git = mocker.Mock(spec_set=GitHelper)
         self.mock_github = mocker.Mock(spec_set=GitHubHelper)
         self.mock_git.get_next_rc_number.return_value = 3
-        self.mock_git.create_rc_tag.return_value = "v2.0.0-rc.3"
         self.mock_git.get_head_sha.return_value = "abc123"
+        self.mock_github.create_rc_tag.return_value = "v2.0.0-rc.3"
         self.mock_github.create_prerelease.return_value = (
             "https://github.com/owner/repo/releases/v2.0.0-rc.3"
         )
@@ -63,7 +63,9 @@ class TestTagRC:
     def test_run_creates_rc_tag_with_correct_number(self) -> None:
         TagRC(self.mock_git, self.mock_github, "2.0.0").run()
 
-        self.mock_git.create_rc_tag.assert_called_once_with("2.0.0", rc_number=3)
+        self.mock_github.create_rc_tag.assert_called_once_with(
+            "2.0.0", "release/2.0.0", rc_number=3
+        )
 
     def test_run_creates_prerelease(self) -> None:
         TagRC(self.mock_git, self.mock_github, "2.0.0").run()
@@ -85,13 +87,12 @@ class TestTagRC:
         TagRC(self.mock_git, self.mock_github, "2.0.0").run()
 
         github_methods = [call[0] for call in self.mock_github.method_calls]
-        git_methods = [call[0] for call in self.mock_git.method_calls]
 
         assert github_methods.index(
             "validate_release_branch_exists"
         ) < github_methods.index("validate_not_finalised")
-        assert git_methods.index("get_next_rc_number") < git_methods.index(
-            "create_rc_tag"
+        assert github_methods.index("create_rc_tag") < github_methods.index(
+            "create_prerelease"
         )
         assert github_methods.index("create_prerelease") < github_methods.index(
             "trigger_promotion"
