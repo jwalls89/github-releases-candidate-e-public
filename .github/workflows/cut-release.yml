@@ -19,6 +19,12 @@ jobs:
   cut-release:
     runs-on: ubuntu-latest
     steps:
+      - name: Normalise version
+        id: version
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "value=${VERSION#v}" >> $GITHUB_OUTPUT
+
       - name: Checkout main
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -30,4 +36,4 @@ jobs:
       - name: Cut release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: uv run invoke release.cut-release --version "${{ inputs.version }}"
+        run: uv run invoke release.cut-release --version "${{ steps.version.outputs.value }}"
