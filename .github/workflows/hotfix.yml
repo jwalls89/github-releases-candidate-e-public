@@ -16,10 +16,16 @@ jobs:
   hotfix:
     runs-on: ubuntu-latest
     steps:
+      - name: Normalise version
+        id: version
+        run: |
+          VERSION="${{ inputs.base_version }}"
+          echo "value=${VERSION#v}" >> $GITHUB_OUTPUT
+
       - name: Checkout from base release tag
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: v${{ inputs.base_version }}
+          ref: v${{ steps.version.outputs.value }}
 
       - name: Setup Python
         uses: ./.github/actions/setup-python
@@ -27,4 +33,4 @@ jobs:
       - name: Create hotfix
         env:
           GH_TOKEN: ${{ github.token }}
-        run: uv run invoke release.hotfix --base-version "${{ inputs.base_version }}"
+        run: uv run invoke release.hotfix --base-version "${{ steps.version.outputs.value }}"

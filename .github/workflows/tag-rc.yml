@@ -16,10 +16,16 @@ jobs:
   tag-rc:
     runs-on: ubuntu-latest
     steps:
+      - name: Normalise version
+        id: version
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "value=${VERSION#v}" >> $GITHUB_OUTPUT
+
       - name: Checkout release branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: release/${{ inputs.version }}
+          ref: release/${{ steps.version.outputs.value }}
 
       - name: Setup Python
         uses: ./.github/actions/setup-python
@@ -27,4 +33,4 @@ jobs:
       - name: Tag RC
         env:
           GH_TOKEN: ${{ github.token }}
-        run: uv run invoke release.tag-rc --version "${{ inputs.version }}"
+        run: uv run invoke release.tag-rc --version "${{ steps.version.outputs.value }}"
