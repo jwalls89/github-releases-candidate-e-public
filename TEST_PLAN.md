@@ -1,143 +1,159 @@
 # Manual Test Plan: Release Pipeline Workflows
 
-This plan covers the three primary workflows (Cut Release, Tag RC, Hotfix) plus edge cases. All tests should be run via the GitHub Actions **workflow_dispatch** UI.
+Tests are ordered so each builds on the state left by the previous one.
+All tests run via GitHub Actions **workflow_dispatch** UI or `gh workflow run`.
 
 ## Prerequisites
 
 - A clean repo state on `main` with at least one commit
-- No in-flight releases (no `release/X.Y.Z` branch without a matching `vX.Y.Z` tag)
+- No tags, releases, or release branches
 - Access to trigger workflows manually (Actions tab)
 
 ---
 
-## 1. Cut Release (cut-release.yml)
+## Phase 1: Cut Release — first release + edge cases needing in-flight state
 
-### 1.1 Happy path — first release
-- [ ] Trigger **Cut Release Candidate** with version `1.0.0`
-- [ ] Verify `release/1.0.0` branch created on origin
-- [ ] Verify `v1.0.0-rc.1` tag created on origin
-- [ ] Verify pre-release `v1.0.0-rc.1` visible on Releases page
-- [ ] Verify Promote workflow was triggered (check Actions tab)
-- [ ] Verify step summary contains branch, tag, and commit SHA
+### 1.1 Cut Release — happy path (first release, v1.0.0)
+- [x] Trigger **Cut Release Candidate** with version `1.0.0` (run 24337567767)
+- [x] Verify `release/1.0.0` branch created on origin (`52c6d5b`)
+- [x] Verify `v1.0.0-rc.1` tag created on origin (`52c6d5b`)
+- [x] Verify pre-release `v1.0.0-rc.1` visible on Releases page
+- [x] Verify Promote workflow was triggered (run 24337578852)
+- [x] Verify step summary contains branch, tag, and commit SHA (visible in logs)
 
-### 1.2 Happy path — subsequent release
-- [ ] Finalise `1.0.0` first (or use a repo with an existing stable release)
-- [ ] Trigger **Cut Release Candidate** with version `2.0.0`
-- [ ] Verify version is accepted (higher than latest stable)
-- [ ] Verify branch, tag, and pre-release created as above
+> State after: `release/1.0.0` exists, `v1.0.0-rc.1` tagged, no stable tag — release is in-flight.
 
-### 1.3 Edge case — version not higher than latest
-- [ ] Trigger **Cut Release Candidate** with a version equal to or lower than the latest stable tag
-- [ ] Verify workflow fails with a clear error message
+### 1.2 Cut Release — release already in-flight
+- [x] Trigger **Cut Release Candidate** with version `3.0.0` (run 24338066056)
+- [x] Verify workflow fails with "still in-flight" error ("Release 1.0.0 is still in-flight")
 
-### 1.4 Edge case — release already in-flight
-- [ ] With an existing `release/X.Y.Z` branch that has no final `vX.Y.Z` tag
-- [ ] Trigger **Cut Release Candidate** with a new version
-- [ ] Verify workflow fails with "still in-flight" error
+### 1.3 Cut Release — invalid version format
+- [x] Trigger **Cut Release Candidate** with version `abc` (run 24338109713)
+- [x] Verify workflow fails with a validation error ("Version must be in semver format")
 
-### 1.5 Edge case — v prefix in input
-- [ ] Trigger **Cut Release Candidate** with version `v1.0.0` (with v prefix)
-- [ ] Verify the `v` prefix is stripped and the workflow succeeds
-
-### 1.6 Edge case — invalid version format
-- [ ] Trigger **Cut Release Candidate** with version `1.0` or `abc`
-- [ ] Verify workflow fails with a validation error
+### 1.4 Cut Release — v prefix in input
+> Cannot test independently — v prefix on `v1.0.0` would hit the in-flight guard.
+> Tested later in Tag RC and Hotfix v-prefix tests instead.
 
 ---
 
-## 2. Tag RC (tag-rc.yml)
+## Phase 2: Promote v1.0.0 to stable
 
-### 2.1 Happy path — tag second RC
-- [ ] Have an existing `release/X.Y.Z` branch with `vX.Y.Z-rc.1` already tagged
-- [ ] Push a fix commit to `release/X.Y.Z`
-- [ ] Trigger **Tag New RC** with the version (e.g., `1.0.0`)
-- [ ] Verify `vX.Y.Z-rc.2` tag created (auto-incremented)
-- [ ] Verify pre-release `vX.Y.Z-rc.2` visible on Releases page
-- [ ] Verify Promote workflow was triggered
-- [ ] Verify step summary shows correct tag, branch, and commit
+### 2.1 Promote — approve through to finalise
+- [x] Approve promote pipeline through test, preprod, prod environments (run 24337578852)
+- [x] Verify finalise creates `v1.0.0` stable tag (`ba9dd20`)
+- [x] Verify stable release `v1.0.0` visible on Releases page as Latest
+- [x] Verify step summary visible in logs ("## Release Finalised")
 
-### 2.2 Happy path — tag first RC on existing branch
-- [ ] Have a `release/X.Y.Z` branch with no RC tags
-- [ ] Trigger **Tag New RC** with the version
-- [ ] Verify `vX.Y.Z-rc.1` is created
-
-### 2.3 Edge case — non-sequential RC numbers
-- [ ] Manually delete an RC tag (e.g., delete rc.2 but rc.1 and rc.3 exist)
-- [ ] Trigger **Tag New RC**
-- [ ] Verify it creates rc.4 (next after highest, not gap-filling)
-
-### 2.4 Edge case — release already finalised
-- [ ] Have a version where `vX.Y.Z` stable tag already exists
-- [ ] Trigger **Tag New RC** with that version
-- [ ] Verify workflow fails with "already finalised" error
-
-### 2.5 Edge case — release branch does not exist
-- [ ] Trigger **Tag New RC** with a version that has no `release/` branch
-- [ ] Verify workflow fails with "branch does not exist" error
-
-### 2.6 Edge case — v prefix in input
-- [ ] Trigger **Tag New RC** with version `v1.0.0`
-- [ ] Verify the `v` prefix is stripped and the workflow succeeds
+> State after: `v1.0.0` finalised. `release/1.0.0` branch still exists.
 
 ---
 
-## 3. Hotfix (hotfix.yml)
+## Phase 3: Tag RC — tests on the finalised v1.0.0 branch
 
-### 3.1 Happy path — first hotfix
-- [ ] Have a finalised release with stable tag `v1.0.0`
-- [ ] Trigger **Hotfix** with base version `1.0.0`
-- [ ] Verify `release/1.0.1` branch created on origin
-- [ ] Verify branch was created from the `v1.0.0` tag commit (not main HEAD)
-- [ ] Verify step summary shows correct base version, hotfix version, and commit
+### 3.1 Tag RC — release already finalised
+- [x] Trigger **Tag New RC** with version `1.0.0` (run 24338289686)
+- [x] Verify workflow fails with "already finalised" error ("Release v1.0.0 is already finalised")
 
-### 3.2 Happy path — second hotfix on same minor
-- [ ] Have `v1.0.0` finalised and `release/1.0.1` already exists (or `v1.0.1` tag exists)
-- [ ] Trigger **Hotfix** with base version `1.0.0`
-- [ ] Verify it creates `release/1.0.2` (skips used patch numbers)
-
-### 3.3 Edge case — RC tags count as used patches
-- [ ] Have `v1.0.0` finalised and a `v1.0.1-rc.1` tag (no stable `v1.0.1`)
-- [ ] Trigger **Hotfix** with base version `1.0.0`
-- [ ] Verify it creates `release/1.0.2` (skips 1.0.1 since RC exists)
-
-### 3.4 Edge case — base tag does not exist
-- [ ] Trigger **Hotfix** with a version that has no stable tag
-- [ ] Verify workflow fails with "does not exist" error
-
-### 3.5 Edge case — hotfix branch already exists
-- [ ] Have `release/1.0.1` already created
-- [ ] Trigger **Hotfix** with base version `1.0.0` (where next patch would be `1.0.1`)
-- [ ] Verify workflow fails with "already exists" error
-
-### 3.6 Edge case — v prefix in input
-- [ ] Trigger **Hotfix** with base version `v1.0.0`
-- [ ] Verify the `v` prefix is stripped and the workflow succeeds
-
-### 3.7 Edge case — hotfix version skips multiple patches
-- [ ] Have `v1.0.0` finalised, `v1.0.1` finalised, `v1.0.2-rc.1` tagged
-- [ ] Trigger **Hotfix** with base version `1.0.0`
-- [ ] Verify it creates `release/1.0.3`
+### 3.2 Tag RC — release branch does not exist
+- [x] Trigger **Tag New RC** with version `9.9.9` (run 24338350441)
+- [x] Verify workflow fails (checkout step fails — branch doesn't exist on origin; Python validation is redundant on CI but useful locally)
 
 ---
 
-## 4. Full Pipeline (end-to-end)
+## Phase 4: Cut Release — subsequent release + remaining edge cases
 
-### 4.1 Cut through to finalise
-- [ ] Cut release `3.0.0` (creates branch + rc.1 + triggers promote)
-- [ ] Approve promote through test, preprod, prod
-- [ ] Verify finalise creates `v3.0.0` stable tag and release
-- [ ] Verify Releases page shows `v3.0.0` as Latest
+### 4.1 Cut Release — happy path (subsequent release, v2.0.0)
+- [x] Trigger **Cut Release Candidate** with version `2.0.0` (run 24339171623)
+- [x] Verify version is accepted (higher than stable v1.0.0)
+- [x] Verify `release/2.0.0` branch, `v2.0.0-rc.1` tag, and pre-release created (`52c6d5b`)
+- [x] Verify Promote workflow was triggered (run 24339181969)
+- [x] Verify step summary visible in logs
 
-### 4.2 Fix and re-promote
-- [ ] After cutting `3.0.0`, push a fix to `release/3.0.0`
-- [ ] Tag new RC (should be rc.2)
-- [ ] Verify previous promote run is cancelled (concurrency group)
-- [ ] Approve new promote through to finalise
-- [ ] Verify final release includes the fix
+> State after: `release/2.0.0` in-flight, `v1.0.0` finalised.
 
-### 4.3 Hotfix after finalise
-- [ ] After `3.0.0` is finalised, trigger Hotfix with base `3.0.0`
-- [ ] Push a fix to the hotfix branch
-- [ ] Tag RC on the hotfix branch
-- [ ] Promote through to finalise
-- [ ] Verify merge-back issue is created if hotfix branch has unique commits
+### 4.2 Cut Release — version not higher than latest
+- [x] Trigger **Cut Release Candidate** with version `0.5.0` (run 24339290842)
+- [x] Verify workflow fails with a clear error message ("Version 0.5.0 is not higher than the latest release 1.0.0")
+
+---
+
+## Phase 5: Tag RC — tests on the in-flight v2.0.0 branch
+
+### 5.1 Tag RC — happy path (second RC)
+- [x] Push a fix commit to `release/2.0.0` (VERSION bump, `ca1e323`)
+- [x] Trigger **Tag New RC** with version `2.0.0` (run 24339469708)
+- [x] Verify `v2.0.0-rc.2` tag created (auto-incremented, `ca1e323`)
+- [x] Verify pre-release `v2.0.0-rc.2` visible on Releases page
+- [x] Verify Promote workflow was triggered (run 24339479206)
+- [x] Verify step summary shows correct tag, branch, and commit
+
+### 5.2 Tag RC — v prefix in input
+- [x] Trigger **Tag New RC** with version `v2.0.0` (run 24343298348)
+- [x] Verify the `v` prefix is stripped and `v2.0.0-rc.3` is created
+
+### 5.3 Tag RC — non-sequential RC numbers
+- [x] Delete `v2.0.0-rc.2` tag from origin (rc.1 and rc.3 remain)
+- [x] Trigger **Tag New RC** with version `2.0.0` (run 24344960394)
+- [x] Verify it creates `v2.0.0-rc.4` (next after highest, not gap-filling)
+
+---
+
+## Phase 6: Promote v2.0.0 to stable
+
+### 6.1 Promote — approve through to finalise
+- [x] Approve promote pipeline through test, preprod, prod (run 24345746228)
+- [x] Verify `v2.0.0` stable tag and release created (`bcdd93`, via GitHub API)
+- [x] Verify Releases page shows `v2.0.0` as Latest
+
+> State after: `v1.0.0` and `v2.0.0` both finalised.
+
+---
+
+## Phase 7: Hotfix
+
+### 7.1 Hotfix — base tag does not exist
+- [x] Trigger **Hotfix** with base version `9.9.9` (run 24346136573)
+- [x] Verify workflow fails (checkout step fails — tag doesn't exist on origin; Python validation is backup for local use)
+
+### 7.2 Hotfix — happy path (first hotfix on v1.0.0)
+- [x] Trigger **Hotfix** with base version `1.0.0` (run 24346240049)
+- [x] Verify `release/1.0.1` branch created on origin (`52c6d5b`)
+- [x] Verify branch was created from the `v1.0.0` tag commit (`52c6d5b`, not main HEAD)
+- [x] Verify step summary shows correct base version, hotfix version, and commit
+
+### 7.3 Hotfix — v prefix in input
+- [x] Trigger **Hotfix** with base version `v2.0.0` (run 24346480600)
+- [x] Verify the `v` prefix is stripped and `release/2.0.1` is created (`ca1e323`)
+
+### 7.4 Hotfix — skips existing branches
+- [x] Trigger **Hotfix** with base version `1.0.0` (run 24349437604, release/1.0.1 exists)
+- [x] Verify workflow skips to `release/1.0.2` (`52c6d5b`, branched from v1.0.0 tag commit)
+
+### 7.5 Hotfix — RC tags and branches count as used patches
+- [x] Tag RC on `release/1.0.1` (created `v1.0.1-rc.1`, run 24349569168)
+- [x] Trigger **Hotfix** with base version `1.0.0` (run 24349626215)
+- [x] Verify it creates `release/1.0.3` (skips 1.0.1 RC tag + 1.0.2 branch)
+
+### 7.6 Hotfix — skips multiple used patches
+- [ ] Finalise `v1.0.1` (promote through to stable)
+- [ ] Trigger **Hotfix** with base version `1.0.0`
+- [ ] Verify it creates `release/1.0.3` (skips 1.0.1 finalised and 1.0.2 with branch)
+
+---
+
+## Phase 8: Full end-to-end scenarios
+
+### 8.1 Fix and re-promote (v3.0.0)
+- [x] Cut release 3.0.0 (run 24350541023), pushed fix to `release/3.0.0` (`fffb0cd`)
+- [x] Tag new RC → `v3.0.0-rc.2` at fix commit (run 24350694095)
+- [x] Verify previous promote run cancelled (24350556746 → cancelled)
+- [x] Approve new promote through to finalise (run 24350711657)
+- [x] Verify final release `v3.0.0` points to fix commit (`fffb0cd`)
+
+### 8.2 Hotfix through to finalise with merge-back (v3.0.1)
+- [x] Trigger Hotfix on v3.0.0 → created `release/3.0.1` (run 24351223003)
+- [x] Push fix to hotfix branch (`2551738`)
+- [x] Tag RC → `v3.0.1-rc.1` (run 24351404470)
+- [x] Promote through to finalise (run 24351423624)
+- [x] Verify merge-back issue created: "Merge back: v3.0.1" (issue #14)
