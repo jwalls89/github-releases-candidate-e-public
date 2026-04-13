@@ -90,12 +90,12 @@ After v1.3.0 reaches prod:
 
 ## Workflows
 
-| Workflow | Run from branch | Trigger | Purpose |
-|----------|----------------|---------|---------|
+| Workflow | Default branch | Trigger | Purpose |
+|----------|---------------|---------|---------|
 | **Cut Release Candidate** | `main` | Manual | Creates branch + rc.1 tag + pre-release, triggers Promote |
-| **Tag New RC** | `release/*` | Manual | Creates next RC tag + pre-release after a fix, triggers Promote |
+| **Tag New RC** | `main` | Manual | Creates next RC tag + pre-release after a fix, triggers Promote |
 | **Hotfix** | `main` | Manual | Creates a new patch release branch from a release tag |
-| **Promote** | `release/*` | Auto-triggered | Deploys test → preprod → prod, creates stable release at prod |
+| **Promote** | `main` | Auto-triggered | Deploys test → preprod → prod, creates stable release at prod |
 | **Deploy** | `release/*` | Called by Promote | Simulates deployment to one environment |
 
 ---
@@ -174,10 +174,9 @@ git push origin release/1.3.0
 
 ### Step 3: Tag a new RC and restart promotion
 
-1. Go to **Actions → Tag New RC**
-2. In the branch dropdown, **select `release/1.3.0`** (not main)
-3. Enter version: `1.3.0`
-4. Click **Run workflow**
+1. Go to **Actions → Tag New RC → Run workflow**
+2. Enter version: `1.3.0`
+3. Click **Run workflow**
 
 **Releases page now shows:**
 - `v1.3.0-rc.2` [Pre-release] — new attempt with fix
@@ -225,10 +224,9 @@ git push origin release/1.3.1
 
 ### Step 3: Start promotion
 
-1. Go to **Actions → Tag New RC**
-2. In the branch dropdown, **select `release/1.3.1`** (not main)
-3. Enter version: `1.3.1`
-4. Click **Run workflow**
+1. Go to **Actions → Tag New RC → Run workflow**
+2. Enter version: `1.3.1`
+3. Click **Run workflow**
 
 **Releases page now shows:**
 - `v1.3.1-rc.1` [Pre-release] — hotfix in progress
@@ -275,9 +273,9 @@ Then open a PR from `merge-back/1.3.0` to `main`, review, and merge. Close the i
 |--------|-----|
 | Cut a release candidate | Actions → **Cut Release Candidate** (from main) → enter version |
 | Approve promotion | Click paused workflow run → **Review deployments** → approve |
-| Fix during promotion | Push fix to release branch → Actions → **Tag New RC** (from release branch) → enter version |
-| Start a hotfix | Actions → **Hotfix** (from main) → enter base version currently in prod |
-| Promote a hotfix | Push fix to hotfix branch → Actions → **Tag New RC** (from hotfix branch) → enter version |
+| Fix during promotion | Push fix to release branch → Actions → **Tag New RC** → enter version |
+| Start a hotfix | Actions → **Hotfix** → enter base version currently in prod |
+| Promote a hotfix | Push fix to hotfix branch → Actions → **Tag New RC** → enter version |
 | Merge back fixes | Follow the merge-back issue created by finalise |
 | See what's in prod | **Releases** page → **Latest** stable release |
 | See what's in-flight | **Releases** page → **Pre-releases** without a matching stable release |
