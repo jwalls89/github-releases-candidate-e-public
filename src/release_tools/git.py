@@ -215,32 +215,3 @@ class GitHelper:
         with self._repo.config_writer() as config:
             config.set_value("user", "name", name)
             config.set_value("user", "email", email)
-
-    def create_final_tag(self, tag_name: str, source_ref: str) -> bool:
-        """Create an annotated release tag at *source_ref* and push it.
-
-        Resolves *source_ref* to a commit SHA via ``ls-remote`` so the
-        tag does not need to exist in the local clone.  Returns ``True``
-        if a new tag was created, ``False`` if it already existed on
-        origin.
-
-        Raises:
-            ValueError: If *source_ref* is not found on origin.
-
-        """
-        ls_remote_output = self._repo.git.ls_remote("--tags", "origin")
-        remote_tag_names = self._parse_remote_ref_names(
-            ls_remote_output, prefix="refs/tags/"
-        )
-
-        if tag_name in remote_tag_names:
-            return False
-
-        source_sha = self._resolve_remote_tag_sha(ls_remote_output, source_ref)
-        if not source_sha:
-            msg = f"Source tag {source_ref} not found on origin"
-            raise ValueError(msg)
-
-        self._repo.create_tag(tag_name, ref=source_sha, message=f"Release {tag_name}")
-        self._repo.remotes.origin.push(tag_name)
-        return True
