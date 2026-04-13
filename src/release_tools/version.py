@@ -1,5 +1,7 @@
 """Version parsing and validation."""
 
+import re
+
 from semver import Version
 
 
@@ -49,3 +51,22 @@ class ReleaseVersionHelper:
                 f" than the latest release {latest_release}"
             )
             raise ValueError(msg)
+
+    @staticmethod
+    def parse_rc(raw_version: str) -> Version:
+        """Parse an RC tag string into a ``semver.Version``.
+
+        Strips an optional 'v' prefix and validates the pre-release
+        suffix matches ``rc.N``.
+
+        Raises:
+            ValueError: If the input is not a valid RC tag.
+
+        """
+        version = ReleaseVersionHelper.parse(raw_version)
+
+        if not version.prerelease or not re.match(r"^rc\.\d+$", version.prerelease):
+            msg = f"Version must be an RC tag (e.g., v1.2.0-rc.1), got: {raw_version}"
+            raise ValueError(msg)
+
+        return version
