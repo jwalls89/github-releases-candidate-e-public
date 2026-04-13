@@ -218,13 +218,22 @@ class TestGitHelper:
     def test_create_release_branch_with_source_ref(self) -> None:
         mock_branch = self.mock_repo.create_head.return_value
         mock_branch.name = "release/1.3.1"
+        self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
+            "refs/tags/v1.3.0",
+        )
 
         self.helper.create_release_branch("1.3.1", source_ref="v1.3.0")
 
         self.mock_repo.create_head.assert_called_once_with(
-            "release/1.3.1", commit="v1.3.0"
+            "release/1.3.1", commit="0" * 40
         )
         self.mock_origin.push.assert_called_once_with("release/1.3.1")
+
+    def test_create_release_branch_raises_when_source_ref_not_found(self) -> None:
+        self.mock_repo.git.ls_remote.return_value = ""
+
+        with pytest.raises(ValueError, match="not found on origin"):
+            self.helper.create_release_branch("1.3.1", source_ref="v1.3.0")
 
     def test_create_rc_tag_creates_and_pushes_tag(self) -> None:
         self.helper.create_rc_tag("1.2.0")
@@ -277,25 +286,46 @@ class TestGitHelper:
         mock_config.set_value.assert_any_call("user", "email", "bot@example.com")
 
     def test_create_final_tag_creates_and_pushes_when_new(self) -> None:
-        self.mock_repo.git.ls_remote.return_value = ""
+        self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
+            "refs/tags/v1.2.0-rc.1",
+        )
 
         result = self.helper.create_final_tag("v1.2.0", "v1.2.0-rc.1")
 
         assert result is True
         self.mock_repo.create_tag.assert_called_once_with(
-            "v1.2.0", ref="v1.2.0-rc.1", message="Release v1.2.0"
+            "v1.2.0", ref="0" * 40, message="Release v1.2.0"
         )
         self.mock_origin.push.assert_called_once_with("v1.2.0")
 
     def test_create_final_tag_returns_false_when_tag_exists(self) -> None:
         self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
             "refs/tags/v1.2.0",
+            "refs/tags/v1.2.0-rc.1",
         )
 
         result = self.helper.create_final_tag("v1.2.0", "v1.2.0-rc.1")
 
         assert result is False
         self.mock_repo.create_tag.assert_not_called()
+
+    def test_create_final_tag_raises_when_source_ref_not_found(self) -> None:
+        self.mock_repo.git.ls_remote.return_value = ""
+
+        with pytest.raises(ValueError, match="not found on origin"):
+            self.helper.create_final_tag("v1.2.0", "v1.2.0-rc.1")
+
+    def test_create_final_tag_prefers_dereferenced_sha(self) -> None:
+        self.mock_repo.git.ls_remote.return_value = (
+            "aaa111\trefs/tags/v1.2.0-rc.1\n"
+            "bbb222\trefs/tags/v1.2.0-rc.1^{}"
+        )
+
+        self.helper.create_final_tag("v1.2.0", "v1.2.0-rc.1")
+
+        self.mock_repo.create_tag.assert_called_once_with(
+            "v1.2.0", ref="bbb222", message="Release v1.2.0"
+        )
 
     @staticmethod
     def _fake_ls_remote(*ref_paths: str) -> str:

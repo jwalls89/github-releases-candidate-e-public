@@ -35,6 +35,27 @@ class GitHelper:
                 ref_names.add(raw_ref.removeprefix(prefix))
         return ref_names
 
+    @staticmethod
+    def _resolve_remote_tag_sha(ls_remote_output: str, tag_name: str) -> str | None:
+        r"""Return the commit SHA for *tag_name* from ``ls-remote`` output.
+
+        For annotated tags, prefers the dereferenced ``^{}`` line
+        (the actual commit SHA).  For lightweight tags, returns the
+        only SHA present.  Returns ``None`` if the tag is not found.
+        """
+        tag_ref = f"refs/tags/{tag_name}"
+        deref_ref = f"{tag_ref}^{{}}"
+        tag_sha: str | None = None
+        for line in ls_remote_output.splitlines():
+            if not line or "\t" not in line:
+                continue
+            sha, raw_ref = line.split("\t", maxsplit=1)
+            if raw_ref == deref_ref:
+                return sha
+            if raw_ref == tag_ref:
+                tag_sha = sha
+        return tag_sha
+
     def get_latest_stable_tag(self) -> Version | None:
         """Return the highest stable semver tag, or ``None``.
 
@@ -146,12 +167,22 @@ class GitHelper:
     ) -> None:
         """Create a ``release/{version}`` branch and push it to origin.
 
-        If *source_ref* is provided, the branch is created at that ref
-        instead of HEAD.  This is used for hotfixes that branch from a
-        stable tag.
+        If *source_ref* is provided, it is resolved to a commit SHA
+        via ``ls-remote`` so it does not need to exist in the local
+        clone.  This is used for hotfixes that branch from a stable
+        tag.
+
+        Raises:
+            ValueError: If *source_ref* is not found on origin.
+
         """
         if source_ref:
-            branch = self._repo.create_head(f"release/{version}", commit=source_ref)
+            ls_remote_output = self._repo.git.ls_remote("--tags", "origin")
+            source_sha = self._resolve_remote_tag_sha(ls_remote_output, source_ref)
+            if not source_sha:
+                msg = f"Source tag {source_ref} not found on origin"
+                raise ValueError(msg)
+            branch = self._repo.create_head(f"release/{version}", commit=source_sha)
         else:
             branch = self._repo.create_head(f"release/{version}")
         self._repo.remotes.origin.push(branch.name)
@@ -189,8 +220,14 @@ class GitHelper:
     def create_final_tag(self, tag_name: str, source_ref: str) -> bool:
         """Create an annotated release tag at *source_ref* and push it.
 
-        Returns ``True`` if a new tag was created, ``False`` if it
-        already existed on origin.
+        Resolves *source_ref* to a commit SHA via ``ls-remote`` so the
+        tag does not need to exist in the local clone.  Returns ``True``
+        if a new tag was created, ``False`` if it already existed on
+        origin.
+
+        Raises:
+            ValueError: If *source_ref* is not found on origin.
+
         """
         ls_remote_output = self._repo.git.ls_remote("--tags", "origin")
         remote_tag_names = self._parse_remote_ref_names(
@@ -200,6 +237,11 @@ class GitHelper:
         if tag_name in remote_tag_names:
             return False
 
-        self._repo.create_tag(tag_name, ref=source_ref, message=f"Release {tag_name}")
+        source_sha = self._resolve_remote_tag_sha(ls_remote_output, source_ref)
+        if not source_sha:
+            msg = f"Source tag {source_ref} not found on origin"
+            raise ValueError(msg)
+
+        self._repo.create_tag(tag_name, ref=source_sha, message=f"Release {tag_name}")
         self._repo.remotes.origin.push(tag_name)
         return True
