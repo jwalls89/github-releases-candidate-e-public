@@ -106,6 +106,48 @@ class GitHubHelper:
         msg = f"Branch {branch_name} already exists"
         raise ValueError(msg)
 
+    def create_final_tag(self, tag_name: str, source_tag: str, message: str) -> bool:
+        """Create an annotated release tag via the GitHub API.
+
+        Resolves *source_tag* to a commit SHA on the remote and creates
+        an annotated tag object plus its ref.  No local clone state is
+        needed.
+
+        Returns ``True`` if a new tag was created, ``False`` if it
+        already existed.
+
+        Raises:
+            ValueError: If *source_tag* does not exist.
+
+        """
+        try:
+            self._repo.get_git_ref(f"tags/{tag_name}")
+        except UnknownObjectException:
+            pass
+        else:
+            return False
+
+        try:
+            source_ref = self._repo.get_git_ref(f"tags/{source_tag}")
+        except UnknownObjectException:
+            msg = f"Source tag {source_tag} not found on GitHub"
+            raise ValueError(msg) from None
+
+        source_sha = source_ref.object.sha
+        # Dereference if annotated tag (points to tag object, not commit)
+        if source_ref.object.type == "tag":
+            tag_obj = self._repo.get_git_tag(source_sha)
+            source_sha = tag_obj.object.sha
+
+        git_tag = self._repo.create_git_tag(
+            tag=tag_name,
+            message=message,
+            object=source_sha,
+            type="commit",
+        )
+        self._repo.create_git_ref(ref=f"refs/tags/{tag_name}", sha=git_tag.sha)
+        return True
+
     def get_mergeback_count(self, branch: str) -> int:
         """Count commits on *branch* that are not on ``main``.
 

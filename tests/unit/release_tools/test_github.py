@@ -136,6 +136,76 @@ class TestGitHubHelper:
         with pytest.raises(ValueError, match="already exists"):
             self.helper.validate_release_branch_does_not_exist("1.0.0")
 
+    # -- create_final_tag --
+
+    def test_create_final_tag_creates_tag_and_ref_when_new(
+        self, mocker: MockerFixture
+    ) -> None:
+        self.mock_repo.get_git_ref.side_effect = [
+            UnknownObjectException(404, {}, {}),  # tag doesn't exist
+            mocker.Mock(object=mocker.Mock(sha="abc123", type="commit")),  # source ref
+        ]
+        mock_tag = mocker.Mock(sha="tag_obj_sha")
+        self.mock_repo.create_git_tag.return_value = mock_tag
+
+        result = self.helper.create_final_tag(
+            "v1.2.0", "v1.2.0-rc.1", message="Release v1.2.0"
+        )
+
+        assert result is True
+        self.mock_repo.create_git_tag.assert_called_once_with(
+            tag="v1.2.0",
+            message="Release v1.2.0",
+            object="abc123",
+            type="commit",
+        )
+        self.mock_repo.create_git_ref.assert_called_once_with(
+            ref="refs/tags/v1.2.0", sha="tag_obj_sha"
+        )
+
+    def test_create_final_tag_returns_false_when_tag_exists(self) -> None:
+        result = self.helper.create_final_tag(
+            "v1.2.0", "v1.2.0-rc.1", message="Release v1.2.0"
+        )
+
+        assert result is False
+        self.mock_repo.create_git_tag.assert_not_called()
+
+    def test_create_final_tag_raises_when_source_tag_not_found(self) -> None:
+        self.mock_repo.get_git_ref.side_effect = [
+            UnknownObjectException(404, {}, {}),  # tag doesn't exist
+            UnknownObjectException(404, {}, {}),  # source tag not found
+        ]
+
+        with pytest.raises(ValueError, match="not found on GitHub"):
+            self.helper.create_final_tag(
+                "v1.2.0", "v1.2.0-rc.1", message="Release v1.2.0"
+            )
+
+    def test_create_final_tag_dereferences_annotated_source_tag(
+        self, mocker: MockerFixture
+    ) -> None:
+        tag_object = mocker.Mock(sha="tag_obj_sha", type="tag")
+        self.mock_repo.get_git_ref.side_effect = [
+            UnknownObjectException(404, {}, {}),  # tag doesn't exist
+            mocker.Mock(object=tag_object),  # source ref is annotated tag
+        ]
+        self.mock_repo.get_git_tag.return_value = mocker.Mock(
+            object=mocker.Mock(sha="commit_sha")
+        )
+        mock_tag = mocker.Mock(sha="new_tag_sha")
+        self.mock_repo.create_git_tag.return_value = mock_tag
+
+        self.helper.create_final_tag("v1.2.0", "v1.2.0-rc.1", message="Release v1.2.0")
+
+        self.mock_repo.get_git_tag.assert_called_once_with("tag_obj_sha")
+        self.mock_repo.create_git_tag.assert_called_once_with(
+            tag="v1.2.0",
+            message="Release v1.2.0",
+            object="commit_sha",
+            type="commit",
+        )
+
     # -- get_mergeback_count --
 
     def test_get_mergeback_count_returns_ahead_by(self, mocker: MockerFixture) -> None:

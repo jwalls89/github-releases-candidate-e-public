@@ -11,9 +11,6 @@ from release_tools.version import ReleaseVersionHelper
 class FinalisePromotion:
     """Command to finalise a promoted RC into a stable release."""
 
-    _BOT_NAME = "github-actions[bot]"
-    _BOT_EMAIL = "github-actions[bot]@users.noreply.github.com"
-
     def __init__(self, git: GitHelper, github: GitHubHelper, raw_version: str) -> None:
         """Initialise with helpers and the RC tag string."""
         self._git = git
@@ -38,9 +35,9 @@ class FinalisePromotion:
 
         print(f"Finalising {rc_tag} as {final_tag}...")
 
-        self._git.configure_identity(self._BOT_NAME, self._BOT_EMAIL)
-
-        created = self._git.create_final_tag(final_tag, rc_tag)
+        created = self._github.create_final_tag(
+            final_tag, rc_tag, message=f"Release {final_tag}"
+        )
         if created:
             print(f"  Created tag {final_tag}")
         else:

@@ -18,7 +18,7 @@ class TestFinalisePromotion:
     def setup(self, mocker: MockerFixture) -> None:
         self.mock_git = mocker.Mock(spec_set=GitHelper)
         self.mock_github = mocker.Mock(spec_set=GitHubHelper)
-        self.mock_git.create_final_tag.return_value = True
+        self.mock_github.create_final_tag.return_value = True
         self.mock_github.get_mergeback_count.return_value = 0
         self.mock_github.find_previous_stable_release.return_value = "v1.0.0"
         self.mock_github.create_mergeback_issue.return_value = (
@@ -29,18 +29,12 @@ class TestFinalisePromotion:
             return_value=Version.parse("2.0.0-rc.1"),
         )
 
-    def test_run_configures_git_identity(self) -> None:
-        FinalisePromotion(self.mock_git, self.mock_github, "v2.0.0-rc.1").run()
-
-        self.mock_git.configure_identity.assert_called_once_with(
-            "github-actions[bot]",
-            "github-actions[bot]@users.noreply.github.com",
-        )
-
     def test_run_creates_final_tag_from_rc(self) -> None:
         FinalisePromotion(self.mock_git, self.mock_github, "v2.0.0-rc.1").run()
 
-        self.mock_git.create_final_tag.assert_called_once_with("v2.0.0", "v2.0.0-rc.1")
+        self.mock_github.create_final_tag.assert_called_once_with(
+            "v2.0.0", "v2.0.0-rc.1", message="Release v2.0.0"
+        )
 
     def test_run_finds_previous_stable_release(self) -> None:
         FinalisePromotion(self.mock_git, self.mock_github, "v2.0.0-rc.1").run()
@@ -93,11 +87,10 @@ class TestFinalisePromotion:
 
         FinalisePromotion(self.mock_git, self.mock_github, "v2.0.0-rc.1").run()
 
-        git_methods = [call[0] for call in self.mock_git.method_calls]
         github_methods = [call[0] for call in self.mock_github.method_calls]
 
-        assert git_methods.index("configure_identity") < git_methods.index(
-            "create_final_tag"
+        assert github_methods.index("create_final_tag") < github_methods.index(
+            "find_previous_stable_release"
         )
         assert github_methods.index(
             "find_previous_stable_release"
