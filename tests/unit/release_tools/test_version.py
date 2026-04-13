@@ -52,3 +52,25 @@ class TestReleaseVersionHelper:
             Version.parse("1.0.0"),
             None,
         )
+
+    def test_parse_rc_returns_version_when_valid_rc_tag(self) -> None:
+        result = ReleaseVersionHelper.parse_rc("1.2.0-rc.1")
+
+        assert result == Version.parse("1.2.0-rc.1")
+
+    def test_parse_rc_returns_version_when_v_prefix(self) -> None:
+        result = ReleaseVersionHelper.parse_rc("v1.2.0-rc.1")
+
+        assert result == Version.parse("1.2.0-rc.1")
+
+    def test_parse_rc_raises_when_stable_version(self) -> None:
+        with pytest.raises(ValueError, match="RC tag"):
+            ReleaseVersionHelper.parse_rc("1.2.0")
+
+    def test_parse_rc_raises_when_invalid_prerelease(self) -> None:
+        with pytest.raises(ValueError, match="RC tag"):
+            ReleaseVersionHelper.parse_rc("1.2.0-beta.1")
+
+    def test_parse_rc_raises_when_invalid_input(self) -> None:
+        with pytest.raises(ValueError, match="semver format"):
+            ReleaseVersionHelper.parse_rc("abc")

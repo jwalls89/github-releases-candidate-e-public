@@ -20,42 +20,21 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.normalise.outputs.version }}
-    env:
-      VERSION: ${{ inputs.version }}
+      version: ${{ steps.validate.outputs.version }}
     steps:
-      - name: Normalise and validate RC tag format
-        id: normalise
-        run: |
-          if [[ "${VERSION}" =~ ^[0-9] ]]; then
-            VERSION="v${VERSION}"
-          fi
-          if [[ ! "${VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
-            echo "::error::Version must be an RC tag (e.g., v1.2.0-rc.1 or 1.2.0-rc.1)"
-            exit 1
-          fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
 
-      - name: Validate tag exists
+      - name: Setup Python
+        uses: ./.github/actions/setup-python
+
+      - name: Validate promotion
+        id: validate
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="${{ steps.normalise.outputs.version }}"
-          if ! gh api "repos/${{ github.repository }}/git/ref/tags/${VERSION}" --silent 2>/dev/null; then
-            echo "::error::Tag ${VERSION} does not exist"
-            exit 1
-          fi
-
-      - name: Validate tag is on a release branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="${{ steps.normalise.outputs.version }}"
-          BRANCH_VERSION=$(echo "${VERSION}" | sed 's/^v//; s/-rc\.[0-9]*//')
-          if ! gh api "repos/${{ github.repository }}/branches/release%2F${BRANCH_VERSION}" --silent 2>/dev/null; then
-            echo "::error::No release branch release/${BRANCH_VERSION} found for tag ${VERSION}. Tags must belong to a release branch."
-            exit 1
-          fi
+        run: uv run invoke release.validate-promotion --version "${{ inputs.version }}"
 
   deploy-test:
     needs: validate
@@ -81,144 +60,17 @@ jobs:
   finalise:
     needs: [validate, deploy-prod]
     runs-on: ubuntu-latest
-    env:
-      VERSION: ${{ needs.validate.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ needs.validate.outputs.version }}
-          fetch-depth: 0
+          ref: main
+          fetch-tags: true
 
-      - name: Determine final version
-        id: final
-        run: |
-          FINAL_VERSION=$(echo "${VERSION}" | sed 's/-rc\.[0-9]*//')
-          echo "version=$FINAL_VERSION" >> $GITHUB_OUTPUT
-          echo "Final version: $FINAL_VERSION"
+      - name: Setup Python
+        uses: ./.github/actions/setup-python
 
-      - name: Create final release tag
-        run: |
-          FINAL="${{ steps.final.outputs.version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git rev-parse "${FINAL}" >/dev/null 2>&1; then
-            echo "Tag ${FINAL} already exists — skipping tag creation"
-          else
-            git tag -a "${FINAL}" -m "Release ${FINAL}"
-            git push origin "${FINAL}"
-          fi
-
-      - name: Find previous stable release
-        id: prev
+      - name: Finalise promotion
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          FINAL="${{ steps.final.outputs.version }}"
-          # Find the previous stable release tag (not pre-release, not current)
-          PREV=$(gh release list --exclude-drafts --exclude-pre-releases \
-            --json tagName --jq '.[].tagName' \
-            | grep -v "^${FINAL}$" \
-            | head -1)
-          echo "previous=${PREV}" >> $GITHUB_OUTPUT
-          if [[ -n "${PREV}" ]]; then
-            echo "Previous stable release: ${PREV}"
-          else
-            echo "No previous stable release found"
-          fi
-
-      - name: Publish stable GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          FINAL="${{ steps.final.outputs.version }}"
-          PREV="${{ steps.prev.outputs.previous }}"
-          if gh release view "${FINAL}" --json isDraft --jq '.isDraft' 2>/dev/null | grep -q true; then
-            echo "Deleting draft release ${FINAL}"
-            gh release delete "${FINAL}" --yes
-          fi
-          if gh release view "${FINAL}" 2>/dev/null | grep -q .; then
-            echo "Release ${FINAL} already exists — skipping"
-          else
-            if [[ -n "${PREV}" ]]; then
-              echo "Creating stable release ${FINAL} with notes from ${PREV}"
-              NOTES=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
-                -f tag_name="${FINAL}" \
-                -f previous_tag_name="${PREV}" \
-                --jq '.body')
-              gh release create "${FINAL}" \
-                --title "${FINAL}" \
-                --notes "${NOTES}" \
-                --latest
-            else
-              echo "Creating stable release ${FINAL} (first release)"
-              gh release create "${FINAL}" \
-                --title "${FINAL}" \
-                --generate-notes \
-                --latest
-            fi
-          fi
-
-      - name: Determine release branch
-        id: branch
-        run: |
-          BRANCH_VERSION=$(echo "${VERSION}" | sed 's/^v//; s/-rc\.[0-9]*//')
-          echo "name=release/${BRANCH_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Check for merge-back need
-        id: mergeback
-        run: |
-          BRANCH="${{ steps.branch.outputs.name }}"
-          AHEAD=$(git rev-list --count origin/main..origin/${BRANCH})
-          echo "ahead=$AHEAD" >> $GITHUB_OUTPUT
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-          if [[ "$AHEAD" -eq 0 ]]; then
-            echo "Release branch has no new commits — no merge-back needed"
-            echo "needed=false" >> $GITHUB_OUTPUT
-          else
-            echo "Release branch is $AHEAD commit(s) ahead of main — merge-back required"
-            echo "needed=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Annotate GitHub Release with merge-back note
-        if: steps.mergeback.outputs.needed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          FINAL="${{ steps.final.outputs.version }}"
-          AHEAD="${{ steps.mergeback.outputs.ahead }}"
-          BRANCH="${{ steps.mergeback.outputs.branch }}"
-          EXISTING_NOTES=$(gh release view "${FINAL}" --json body --jq '.body')
-          MERGE_NOTE="---"
-          MERGE_NOTE="${MERGE_NOTE}\n\n⚠️ **Merge-back required:** This release has ${AHEAD} commit(s) on \`${BRANCH}\` that are not on \`main\`. See the merge-back issue for instructions."
-          gh release edit "${FINAL}" \
-            --notes "$(echo -e "${EXISTING_NOTES}\n\n${MERGE_NOTE}")"
-
-      - name: Create merge-back issue
-        if: steps.mergeback.outputs.needed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          FINAL="${{ steps.final.outputs.version }}"
-          AHEAD="${{ steps.mergeback.outputs.ahead }}"
-          BRANCH="${{ steps.mergeback.outputs.branch }}"
-          MERGE_VERSION="${FINAL#v}"
-          gh issue create \
-            --title "Merge back: ${FINAL}" \
-            --body "$(echo -e "Release **${FINAL}** has ${AHEAD} commit(s) on \`${BRANCH}\` that need merging back to \`main\`.\n\n## Steps\n\n\`\`\`bash\ngit fetch origin\ngit checkout main\ngit pull origin main\ngit checkout -b merge-back/${MERGE_VERSION}\ngit merge origin/${BRANCH}\n# Resolve conflicts if any\ngit push origin merge-back/${MERGE_VERSION}\n\`\`\`\n\nThen open a PR from \`merge-back/${MERGE_VERSION}\` to \`main\`:\n\nhttps://github.com/${{ github.repository }}/compare/main...merge-back/${MERGE_VERSION}?expand=1\n\nClose this issue once the PR is merged.")"
-
-      - name: Summary
-        run: |
-          FINAL="${{ steps.final.outputs.version }}"
-          echo "## Release Finalised" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Release:** ${FINAL} (stable — visible on Releases page)" >> $GITHUB_STEP_SUMMARY
-          echo "- **From RC:** ${VERSION}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Releases page now shows" >> $GITHUB_STEP_SUMMARY
-          echo "- **${FINAL}** — Latest (stable release)" >> $GITHUB_STEP_SUMMARY
-          echo "- Previous pre-releases show the RC history" >> $GITHUB_STEP_SUMMARY
-          if [[ "${{ steps.mergeback.outputs.needed }}" == "true" ]]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ **Merge-back required** — ${{ steps.mergeback.outputs.ahead }} commit(s) need merging to main. See issue." >> $GITHUB_STEP_SUMMARY
-          fi
+        run: uv run invoke release.finalise-promotion --version "${{ needs.validate.outputs.version }}"
