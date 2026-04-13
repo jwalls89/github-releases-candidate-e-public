@@ -144,29 +144,30 @@ class TestGitHelper:
     def test_get_next_hotfix_version_returns_patch_plus_1_when_no_higher(
         self,
     ) -> None:
-        self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
-            "refs/tags/v1.3.0",
-        )
+        self.mock_repo.git.ls_remote.side_effect = [
+            self._fake_ls_remote("refs/tags/v1.3.0"),
+            "",
+        ]
 
         result = self.helper.get_next_hotfix_version(Version.parse("1.3.0"))
 
         assert result == Version(1, 3, 1)
 
     def test_get_next_hotfix_version_skips_existing_stable_patches(self) -> None:
-        self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
-            "refs/tags/v1.3.0",
-            "refs/tags/v1.3.1",
-        )
+        self.mock_repo.git.ls_remote.side_effect = [
+            self._fake_ls_remote("refs/tags/v1.3.0", "refs/tags/v1.3.1"),
+            "",
+        ]
 
         result = self.helper.get_next_hotfix_version(Version.parse("1.3.0"))
 
         assert result == Version(1, 3, 2)
 
     def test_get_next_hotfix_version_skips_existing_rc_patches(self) -> None:
-        self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
-            "refs/tags/v1.3.0",
-            "refs/tags/v1.3.1-rc.1",
-        )
+        self.mock_repo.git.ls_remote.side_effect = [
+            self._fake_ls_remote("refs/tags/v1.3.0", "refs/tags/v1.3.1-rc.1"),
+            "",
+        ]
 
         result = self.helper.get_next_hotfix_version(Version.parse("1.3.0"))
 
@@ -175,35 +176,56 @@ class TestGitHelper:
     def test_get_next_hotfix_version_finds_highest_across_stable_and_rc(
         self,
     ) -> None:
-        self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
-            "refs/tags/v1.3.0",
-            "refs/tags/v1.3.1",
-            "refs/tags/v1.3.2-rc.1",
-        )
+        self.mock_repo.git.ls_remote.side_effect = [
+            self._fake_ls_remote(
+                "refs/tags/v1.3.0", "refs/tags/v1.3.1", "refs/tags/v1.3.2-rc.1"
+            ),
+            "",
+        ]
 
         result = self.helper.get_next_hotfix_version(Version.parse("1.3.0"))
 
         assert result == Version(1, 3, 3)
 
     def test_get_next_hotfix_version_ignores_other_minor_versions(self) -> None:
-        self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
-            "refs/tags/v1.3.0",
-            "refs/tags/v1.4.1",
-        )
+        self.mock_repo.git.ls_remote.side_effect = [
+            self._fake_ls_remote("refs/tags/v1.3.0", "refs/tags/v1.4.1"),
+            "",
+        ]
 
         result = self.helper.get_next_hotfix_version(Version.parse("1.3.0"))
 
         assert result == Version(1, 3, 1)
 
     def test_get_next_hotfix_version_ignores_other_major_versions(self) -> None:
-        self.mock_repo.git.ls_remote.return_value = self._fake_ls_remote(
-            "refs/tags/v1.3.0",
-            "refs/tags/v2.3.1",
-        )
+        self.mock_repo.git.ls_remote.side_effect = [
+            self._fake_ls_remote("refs/tags/v1.3.0", "refs/tags/v2.3.1"),
+            "",
+        ]
 
         result = self.helper.get_next_hotfix_version(Version.parse("1.3.0"))
 
         assert result == Version(1, 3, 1)
+
+    def test_get_next_hotfix_version_skips_existing_release_branches(self) -> None:
+        self.mock_repo.git.ls_remote.side_effect = [
+            self._fake_ls_remote("refs/tags/v1.3.0"),
+            self._fake_ls_remote("refs/heads/release/1.3.1"),
+        ]
+
+        result = self.helper.get_next_hotfix_version(Version.parse("1.3.0"))
+
+        assert result == Version(1, 3, 2)
+
+    def test_get_next_hotfix_version_considers_both_tags_and_branches(self) -> None:
+        self.mock_repo.git.ls_remote.side_effect = [
+            self._fake_ls_remote("refs/tags/v1.3.0", "refs/tags/v1.3.1"),
+            self._fake_ls_remote("refs/heads/release/1.3.2"),
+        ]
+
+        result = self.helper.get_next_hotfix_version(Version.parse("1.3.0"))
+
+        assert result == Version(1, 3, 3)
 
     def test_create_release_branch_creates_and_pushes_branch(self) -> None:
         mock_branch = self.mock_repo.create_head.return_value

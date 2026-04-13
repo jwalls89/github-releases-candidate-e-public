@@ -135,29 +135,42 @@ class GitHelper:
     def get_next_hotfix_version(self, base_version: Version) -> Version:
         """Return the next available hotfix version for *base_version*.
 
-        Scans all remote tags in a single ``ls-remote`` call to find
-        the highest patch number in use for the same ``major.minor``
-        series (counting both stable tags and RC tags as "used"),
-        then returns the next patch version.
+        Scans remote tags and release branches to find the highest
+        patch number in use for the same ``major.minor`` series.
+        Tags (both stable and RC) and ``release/`` branches all
+        count as "used", then returns the next patch version.
         """
-        ls_remote_output = self._repo.git.ls_remote("--tags", "origin")
+        ls_remote_tags = self._repo.git.ls_remote("--tags", "origin")
         remote_tag_names = self._parse_remote_ref_names(
-            ls_remote_output, prefix="refs/tags/"
+            ls_remote_tags, prefix="refs/tags/"
         )
 
-        version_prefix = f"v{base_version.major}.{base_version.minor}."
-        patch_pattern = re.compile(
+        ls_remote_heads = self._repo.git.ls_remote("--heads", "origin")
+        remote_branch_names = self._parse_remote_ref_names(
+            ls_remote_heads, prefix="refs/heads/"
+        )
+
+        tag_prefix = f"v{base_version.major}.{base_version.minor}."
+        tag_pattern = re.compile(
             rf"^v{base_version.major}\.{base_version.minor}\.(\d+)(?:-rc\.\d+)?$"
         )
+        branch_prefix = f"release/{base_version.major}.{base_version.minor}."
 
         highest_patch = base_version.patch
         for tag_name in remote_tag_names:
-            if not tag_name.startswith(version_prefix):
+            if not tag_name.startswith(tag_prefix):
                 continue
-            match = patch_pattern.match(tag_name)
+            match = tag_pattern.match(tag_name)
             if match:
                 patch = int(match.group(1))
                 highest_patch = max(highest_patch, patch)
+
+        for branch_name in remote_branch_names:
+            if not branch_name.startswith(branch_prefix):
+                continue
+            patch_str = branch_name.removeprefix(branch_prefix)
+            if patch_str.isdigit():
+                highest_patch = max(highest_patch, int(patch_str))
 
         return Version(base_version.major, base_version.minor, highest_patch + 1)
 
