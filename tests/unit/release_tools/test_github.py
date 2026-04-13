@@ -64,6 +64,37 @@ class TestGitHubHelper:
 
         assert result == "https://github.com/owner/repo/releases/v1.0.0-rc.1"
 
+    # -- create_rc_tag --
+
+    def test_create_rc_tag_creates_ref_at_branch_tip(
+        self, mocker: MockerFixture
+    ) -> None:
+        mock_branch = mocker.Mock()
+        mock_branch.commit.sha = "abc123"
+        self.mock_repo.get_branch.return_value = mock_branch
+
+        result = self.helper.create_rc_tag("1.2.0", "release/1.2.0")
+
+        assert result == "v1.2.0-rc.1"
+        self.mock_repo.get_branch.assert_called_once_with("release/1.2.0")
+        self.mock_repo.create_git_ref.assert_called_once_with(
+            ref="refs/tags/v1.2.0-rc.1", sha="abc123"
+        )
+
+    def test_create_rc_tag_uses_custom_rc_number(self, mocker: MockerFixture) -> None:
+        mock_branch = mocker.Mock()
+        mock_branch.commit.sha = "abc123"
+        self.mock_repo.get_branch.return_value = mock_branch
+
+        result = self.helper.create_rc_tag("1.2.0", "release/1.2.0", rc_number=3)
+
+        assert result == "v1.2.0-rc.3"
+        self.mock_repo.create_git_ref.assert_called_once_with(
+            ref="refs/tags/v1.2.0-rc.3", sha="abc123"
+        )
+
+    # -- trigger_promotion --
+
     def test_trigger_promotion_dispatches_workflow(self) -> None:
         self.helper.trigger_promotion("release/1.0.0", "v1.0.0-rc.1")
 

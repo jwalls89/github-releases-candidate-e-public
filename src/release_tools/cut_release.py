@@ -39,7 +39,7 @@ class CutRelease:
         self._git.create_release_branch(version_str)
 
         print(f"Creating RC tag v{version_str}-rc.1...")
-        tag_name = self._git.create_rc_tag(version_str)
+        tag_name = self._github.create_rc_tag(version_str, branch)
 
         previous_tag = f"v{latest}" if latest else None
         print(f"Publishing pre-release {tag_name}...")

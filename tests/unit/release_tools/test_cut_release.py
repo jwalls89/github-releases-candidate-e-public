@@ -20,8 +20,8 @@ class TestCutRelease:
         self.mock_github = mocker.Mock(spec_set=GitHubHelper)
         self.mock_git.get_latest_stable_tag.return_value = Version.parse("1.0.0")
         self.mock_git.get_inflight_release.return_value = None
-        self.mock_git.create_rc_tag.return_value = "v2.0.0-rc.1"
         self.mock_git.get_head_sha.return_value = "abc123"
+        self.mock_github.create_rc_tag.return_value = "v2.0.0-rc.1"
         mocker.patch(
             "release_tools.cut_release.ReleaseVersionHelper.parse",
             return_value=Version.parse("2.0.0"),
@@ -34,7 +34,7 @@ class TestCutRelease:
         CutRelease(self.mock_git, self.mock_github, "2.0.0").run()
 
         self.mock_git.create_release_branch.assert_called_once_with("2.0.0")
-        self.mock_git.create_rc_tag.assert_called_once_with("2.0.0")
+        self.mock_github.create_rc_tag.assert_called_once_with("2.0.0", "release/2.0.0")
 
     def test_run_raises_when_version_not_higher(self, mocker: MockerFixture) -> None:
         mocker.patch(
@@ -92,11 +92,10 @@ class TestCutRelease:
     def test_run_calls_steps_in_correct_order(self) -> None:
         CutRelease(self.mock_git, self.mock_github, "2.0.0").run()
 
-        git_methods = [c[0] for c in self.mock_git.method_calls]
         github_methods = [c[0] for c in self.mock_github.method_calls]
 
-        assert git_methods.index("create_release_branch") < git_methods.index(
-            "create_rc_tag"
+        assert github_methods.index("create_rc_tag") < github_methods.index(
+            "create_prerelease"
         )
         assert github_methods.index("create_prerelease") < github_methods.index(
             "trigger_promotion"

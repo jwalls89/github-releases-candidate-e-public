@@ -36,6 +36,20 @@ class GitHubHelper:
         )
         return release.html_url
 
+    def create_rc_tag(
+        self, version: str, target_branch: str, rc_number: int = 1
+    ) -> str:
+        """Create a lightweight RC tag via the GitHub API.
+
+        Resolves *target_branch* to its tip commit and creates a tag
+        ref pointing at it.  Returns the tag name.
+        """
+        tag_name = f"v{version}-rc.{rc_number}"
+        branch_ref = self._repo.get_branch(target_branch)
+        commit_sha = branch_ref.commit.sha
+        self._repo.create_git_ref(ref=f"refs/tags/{tag_name}", sha=commit_sha)
+        return tag_name
+
     def trigger_promotion(self, branch: str, tag_name: str) -> None:
         """Trigger the promote workflow on the given branch."""
         workflow = self._repo.get_workflow("promote.yml")

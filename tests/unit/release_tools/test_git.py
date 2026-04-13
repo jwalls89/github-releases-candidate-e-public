@@ -256,23 +256,6 @@ class TestGitHelper:
         with pytest.raises(ValueError, match="not found on origin"):
             self.helper.create_release_branch("1.3.1", source_ref="v1.3.0")
 
-    def test_create_rc_tag_creates_and_pushes_tag(self) -> None:
-        self.helper.create_rc_tag("1.2.0")
-
-        self.mock_repo.create_tag.assert_called_once_with("v1.2.0-rc.1")
-        self.mock_origin.push.assert_called_once_with("v1.2.0-rc.1")
-
-    def test_create_rc_tag_returns_tag_name(self) -> None:
-        result = self.helper.create_rc_tag("1.2.0")
-
-        assert result == "v1.2.0-rc.1"
-
-    def test_create_rc_tag_uses_custom_rc_number(self) -> None:
-        result = self.helper.create_rc_tag("1.2.0", rc_number=3)
-
-        assert result == "v1.2.0-rc.3"
-        self.mock_repo.create_tag.assert_called_once_with("v1.2.0-rc.3")
-
     def test_get_repo_name_parses_ssh_url(self) -> None:
         self.mock_origin.url = "git@github.com:owner/repo.git"
 
