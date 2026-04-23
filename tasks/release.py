@@ -17,8 +17,16 @@ from release_tools.tag_rc import TagRC
 from release_tools.validate_promotion import ValidatePromotion
 
 
-@task(help={"version": "Release version (e.g., 1.2.0 or v1.2.0)"})
-def cut_release(_ctx: Context, version: str) -> None:
+@task(
+    help={
+        "version": "Release version (e.g., 1.2.0 or v1.2.0)",
+        "commit-id": (
+            "Optional 40-char commit SHA on main to cut from."
+            " Defaults to the tip of the default branch."
+        ),
+    }
+)
+def cut_release(_ctx: Context, version: str, commit_id: str | None = None) -> None:
     """Cut a new release candidate.
 
     On GitHub Actions, GH_TOKEN and GITHUB_REPOSITORY are provided
@@ -42,7 +50,7 @@ def cut_release(_ctx: Context, version: str) -> None:
     github = GitHubHelper(Github(token).get_repo(repo_name))
 
     try:
-        CutRelease(git, github, version).run()
+        CutRelease(git, github, version, commit_id or None).run()
     except (ValueError, RuntimeError) as err:
         raise Exit(str(err), code=1) from err
 

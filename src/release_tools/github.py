@@ -194,6 +194,21 @@ class GitHubHelper:
         comparison = self._repo.compare("main", branch)
         return comparison.ahead_by
 
+    def is_ancestor_of_main(self, sha: str) -> bool:
+        """Return ``True`` if *sha* is on ``main``'s history.
+
+        Uses the GitHub compare API, so no local history is needed.
+        A commit is considered an ancestor when the compare status
+        is ``identical`` or ``behind`` — meaning ``main`` is at or
+        ahead of the commit.  Returns ``False`` when the commit
+        does not exist on the remote.
+        """
+        try:
+            comparison = self._repo.compare("main", sha)
+        except UnknownObjectException:
+            return False
+        return comparison.status in ("identical", "behind")
+
     def find_previous_stable_release(self, exclude_tag: str) -> str | None:
         """Find the previous stable release tag, excluding *exclude_tag*.
 

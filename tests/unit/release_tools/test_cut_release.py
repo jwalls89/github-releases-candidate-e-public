@@ -99,3 +99,26 @@ class TestCutRelease:
         assert github_methods.index("create_prerelease") < github_methods.index(
             "trigger_promotion"
         )
+
+    def test_run_skips_ancestor_check_when_commit_id_not_given(self) -> None:
+        CutRelease(self.mock_git, self.mock_github, "2.0.0").run()
+
+        self.mock_github.is_ancestor_of_main.assert_not_called()
+
+    def test_run_checks_ancestor_when_commit_id_given(self) -> None:
+        self.mock_github.is_ancestor_of_main.return_value = True
+
+        CutRelease(self.mock_git, self.mock_github, "2.0.0", commit_id="a" * 40).run()
+
+        self.mock_github.is_ancestor_of_main.assert_called_once_with("a" * 40)
+        self.mock_git.create_release_branch.assert_called_once_with("2.0.0")
+
+    def test_run_raises_when_commit_not_ancestor_of_main(self) -> None:
+        self.mock_github.is_ancestor_of_main.return_value = False
+
+        with pytest.raises(ValueError, match="not on main"):
+            CutRelease(
+                self.mock_git, self.mock_github, "2.0.0", commit_id="b" * 40
+            ).run()
+
+        self.mock_git.create_release_branch.assert_not_called()
