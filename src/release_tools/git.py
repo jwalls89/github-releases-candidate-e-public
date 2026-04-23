@@ -174,11 +174,6 @@ class GitHelper:
 
         return Version(base_version.major, base_version.minor, highest_patch + 1)
 
-    def create_release_branch(self, version: str) -> None:
-        """Create a ``release/{version}`` branch from HEAD and push it."""
-        branch = self._repo.create_head(f"release/{version}")
-        self._repo.remotes.origin.push(branch.name)
-
     def get_repo_name(self) -> str:
         """Derive the GitHub ``owner/repo`` name from the origin URL."""
         origin_url = self._repo.remotes.origin.url

@@ -7,6 +7,11 @@ on:
         description: "Release version (e.g., 1.2.0)"
         required: true
         type: string
+      commit_id:
+        description: "Optional 40-char commit SHA on main. Leave blank for main tip."
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: cut-release
@@ -34,4 +39,4 @@ jobs:
       - name: Cut release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: uv run invoke release.cut-release --version "${{ steps.version.outputs.value }}"
+        run: uv run invoke release.cut-release --version "${{ steps.version.outputs.value }}" --commit-id "${{ inputs.commit_id }}"

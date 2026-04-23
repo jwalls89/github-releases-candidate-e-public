@@ -194,6 +194,33 @@ class GitHubHelper:
         comparison = self._repo.compare("main", branch)
         return comparison.ahead_by
 
+    def get_main_tip_sha(self) -> str:
+        """Return the commit SHA at the tip of the ``main`` branch."""
+        return self._repo.get_branch("main").commit.sha
+
+    def create_release_branch_at(self, version: str, sha: str) -> str:
+        """Create ``release/{version}`` at *sha* via the GitHub API.
+
+        Returns the commit SHA the branch points to.
+        """
+        self._repo.create_git_ref(ref=f"refs/heads/release/{version}", sha=sha)
+        return sha
+
+    def is_ancestor_of_main(self, sha: str) -> bool:
+        """Return ``True`` if *sha* is on ``main``'s history.
+
+        Uses the GitHub compare API, so no local history is needed.
+        A commit is considered an ancestor when the compare status
+        is ``identical`` or ``behind`` — meaning ``main`` is at or
+        ahead of the commit.  Returns ``False`` when the commit
+        does not exist on the remote.
+        """
+        try:
+            comparison = self._repo.compare("main", sha)
+        except UnknownObjectException:
+            return False
+        return comparison.status in ("identical", "behind")
+
     def find_previous_stable_release(self, exclude_tag: str) -> str | None:
         """Find the previous stable release tag, excluding *exclude_tag*.
 

@@ -295,6 +295,62 @@ class TestGitHubHelper:
 
         assert result == 0
 
+    # -- get_main_tip_sha --
+
+    def test_get_main_tip_sha_returns_branch_commit_sha(
+        self, mocker: MockerFixture
+    ) -> None:
+        mock_branch = mocker.Mock()
+        mock_branch.commit.sha = "deadbeef"
+        self.mock_repo.get_branch.return_value = mock_branch
+
+        result = self.helper.get_main_tip_sha()
+
+        assert result == "deadbeef"
+        self.mock_repo.get_branch.assert_called_once_with("main")
+
+    # -- create_release_branch_at --
+
+    def test_create_release_branch_at_creates_ref_at_sha(self) -> None:
+        result = self.helper.create_release_branch_at("1.2.0", "abc123")
+
+        assert result == "abc123"
+        self.mock_repo.create_git_ref.assert_called_once_with(
+            ref="refs/heads/release/1.2.0", sha="abc123"
+        )
+
+    # -- is_ancestor_of_main --
+
+    def test_is_ancestor_of_main_true_when_behind(self, mocker: MockerFixture) -> None:
+        self.mock_repo.compare.return_value = mocker.Mock(status="behind")
+
+        assert self.helper.is_ancestor_of_main("abc123") is True
+        self.mock_repo.compare.assert_called_once_with("main", "abc123")
+
+    def test_is_ancestor_of_main_true_when_identical(
+        self, mocker: MockerFixture
+    ) -> None:
+        self.mock_repo.compare.return_value = mocker.Mock(status="identical")
+
+        assert self.helper.is_ancestor_of_main("abc123") is True
+
+    def test_is_ancestor_of_main_false_when_ahead(self, mocker: MockerFixture) -> None:
+        self.mock_repo.compare.return_value = mocker.Mock(status="ahead")
+
+        assert self.helper.is_ancestor_of_main("abc123") is False
+
+    def test_is_ancestor_of_main_false_when_diverged(
+        self, mocker: MockerFixture
+    ) -> None:
+        self.mock_repo.compare.return_value = mocker.Mock(status="diverged")
+
+        assert self.helper.is_ancestor_of_main("abc123") is False
+
+    def test_is_ancestor_of_main_false_when_commit_not_found(self) -> None:
+        self.mock_repo.compare.side_effect = UnknownObjectException(404, {}, {})
+
+        assert self.helper.is_ancestor_of_main("doesnotexist") is False
+
     # -- find_previous_stable_release --
 
     def test_find_previous_stable_release_returns_first_stable_tag(

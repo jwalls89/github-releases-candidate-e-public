@@ -11,15 +11,29 @@ from release_tools.version import ReleaseVersionHelper
 class CutRelease:
     """Command to cut a new release candidate."""
 
-    def __init__(self, git: GitHelper, github: GitHubHelper, raw_version: str) -> None:
+    def __init__(
+        self,
+        git: GitHelper,
+        github: GitHubHelper,
+        raw_version: str,
+        commit_id: str | None = None,
+    ) -> None:
         """Initialise with a git helper, GitHub helper, and version string."""
         self._git = git
         self._github = github
         self._raw_version = raw_version
+        self._commit_id = commit_id
 
     def run(self) -> None:
         """Orchestrate cutting a new release candidate."""
         version = ReleaseVersionHelper.parse(self._raw_version)
+
+        if self._commit_id and not self._github.is_ancestor_of_main(self._commit_id):
+            msg = (
+                f"Commit {self._commit_id} is not on main."
+                " Releases must be cut from commits reachable from main."
+            )
+            raise ValueError(msg)
 
         latest = self._git.get_latest_stable_tag()
         ReleaseVersionHelper.check_version_is_higher(version, latest)
@@ -35,8 +49,10 @@ class CutRelease:
         version_str = str(version)
         branch = f"release/{version_str}"
 
-        print(f"Creating release branch {branch}...")
-        self._git.create_release_branch(version_str)
+        source_sha = self._commit_id or self._github.get_main_tip_sha()
+
+        print(f"Creating release branch {branch} at {source_sha}...")
+        self._github.create_release_branch_at(version_str, source_sha)
 
         print(f"Creating RC tag v{version_str}-rc.1...")
         tag_name, commit_sha = self._github.create_rc_tag(version_str, branch)
