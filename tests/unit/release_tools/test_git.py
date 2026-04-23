@@ -227,15 +227,6 @@ class TestGitHelper:
 
         assert result == Version(1, 3, 3)
 
-    def test_create_release_branch_creates_and_pushes_branch(self) -> None:
-        mock_branch = self.mock_repo.create_head.return_value
-        mock_branch.name = "release/1.2.0"
-
-        self.helper.create_release_branch("1.2.0")
-
-        self.mock_repo.create_head.assert_called_once_with("release/1.2.0")
-        self.mock_origin.push.assert_called_once_with("release/1.2.0")
-
     def test_get_repo_name_parses_ssh_url(self) -> None:
         self.mock_origin.url = "git@github.com:owner/repo.git"
 

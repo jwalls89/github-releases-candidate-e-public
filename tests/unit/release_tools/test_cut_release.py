@@ -21,6 +21,7 @@ class TestCutRelease:
         self.mock_git.get_latest_stable_tag.return_value = Version.parse("1.0.0")
         self.mock_git.get_inflight_release.return_value = None
         self.mock_github.create_rc_tag.return_value = ("v2.0.0-rc.1", "abc123")
+        self.mock_github.get_main_tip_sha.return_value = "main_tip_sha"
         mocker.patch(
             "release_tools.cut_release.ReleaseVersionHelper.parse",
             return_value=Version.parse("2.0.0"),
@@ -32,7 +33,9 @@ class TestCutRelease:
     def test_run_creates_branch_and_tag_when_valid_version(self) -> None:
         CutRelease(self.mock_git, self.mock_github, "2.0.0").run()
 
-        self.mock_git.create_release_branch.assert_called_once_with("2.0.0")
+        self.mock_github.create_release_branch_at.assert_called_once_with(
+            "2.0.0", "main_tip_sha"
+        )
         self.mock_github.create_rc_tag.assert_called_once_with("2.0.0", "release/2.0.0")
 
     def test_run_raises_when_version_not_higher(self, mocker: MockerFixture) -> None:
@@ -111,7 +114,10 @@ class TestCutRelease:
         CutRelease(self.mock_git, self.mock_github, "2.0.0", commit_id="a" * 40).run()
 
         self.mock_github.is_ancestor_of_main.assert_called_once_with("a" * 40)
-        self.mock_git.create_release_branch.assert_called_once_with("2.0.0")
+        self.mock_github.create_release_branch_at.assert_called_once_with(
+            "2.0.0", "a" * 40
+        )
+        self.mock_github.get_main_tip_sha.assert_not_called()
 
     def test_run_raises_when_commit_not_ancestor_of_main(self) -> None:
         self.mock_github.is_ancestor_of_main.return_value = False
@@ -121,4 +127,4 @@ class TestCutRelease:
                 self.mock_git, self.mock_github, "2.0.0", commit_id="b" * 40
             ).run()
 
-        self.mock_git.create_release_branch.assert_not_called()
+        self.mock_github.create_release_branch_at.assert_not_called()

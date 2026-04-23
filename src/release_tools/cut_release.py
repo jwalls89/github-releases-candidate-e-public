@@ -49,8 +49,10 @@ class CutRelease:
         version_str = str(version)
         branch = f"release/{version_str}"
 
-        print(f"Creating release branch {branch}...")
-        self._git.create_release_branch(version_str)
+        source_sha = self._commit_id or self._github.get_main_tip_sha()
+
+        print(f"Creating release branch {branch} at {source_sha}...")
+        self._github.create_release_branch_at(version_str, source_sha)
 
         print(f"Creating RC tag v{version_str}-rc.1...")
         tag_name, commit_sha = self._github.create_rc_tag(version_str, branch)

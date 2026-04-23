@@ -295,6 +295,30 @@ class TestGitHubHelper:
 
         assert result == 0
 
+    # -- get_main_tip_sha --
+
+    def test_get_main_tip_sha_returns_branch_commit_sha(
+        self, mocker: MockerFixture
+    ) -> None:
+        mock_branch = mocker.Mock()
+        mock_branch.commit.sha = "deadbeef"
+        self.mock_repo.get_branch.return_value = mock_branch
+
+        result = self.helper.get_main_tip_sha()
+
+        assert result == "deadbeef"
+        self.mock_repo.get_branch.assert_called_once_with("main")
+
+    # -- create_release_branch_at --
+
+    def test_create_release_branch_at_creates_ref_at_sha(self) -> None:
+        result = self.helper.create_release_branch_at("1.2.0", "abc123")
+
+        assert result == "abc123"
+        self.mock_repo.create_git_ref.assert_called_once_with(
+            ref="refs/heads/release/1.2.0", sha="abc123"
+        )
+
     # -- is_ancestor_of_main --
 
     def test_is_ancestor_of_main_true_when_behind(self, mocker: MockerFixture) -> None:
